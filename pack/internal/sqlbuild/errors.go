@@ -36,3 +36,11 @@ type ErrRowLockingUnsupportedByDialect struct {
 func (e *ErrRowLockingUnsupportedByDialect) Error() string {
 	return fmt.Sprintf("sqlbuild: %s does not support row locking", e.Dialect)
 }
+
+type ErrReturningUnsupportedByDialect struct {
+	Dialect string
+}
+
+func (e *ErrReturningUnsupportedByDialect) Error() string {
+	return fmt.Sprintf("sqlbuild: %s does not support INSERT ... RETURNING", e.Dialect)
+}

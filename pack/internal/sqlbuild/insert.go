@@ -54,10 +54,20 @@ func (b *InsertBuilder) OnConflictDoUpdate(cols []Column, assignments ...Assignm
 }
 
 func (b *InsertBuilder) Render(d dialect.Dialect) (string, []any, error) {
+	if len(b.returning) > 0 && !d.SupportsReturning() {
+		return "", nil, &ErrReturningUnsupportedByDialect{Dialect: d.Name()}
+	}
+
+	mysqlStyleConflict := len(b.conflictCols) > 0 && !d.SupportsOnConflict()
+
 	r := newRenderer(d)
 	var sb strings.Builder
 
-	sb.WriteString("INSERT INTO ")
+	if mysqlStyleConflict && b.conflictDoNothing {
+		sb.WriteString("INSERT IGNORE INTO ")
+	} else {
+		sb.WriteString("INSERT INTO ")
+	}
 	sb.WriteString(r.d.QuoteIdent(b.table.Name))
 
 	if len(b.rows) > 0 {
@@ -92,7 +102,7 @@ func (b *InsertBuilder) Render(d dialect.Dialect) (string, []any, error) {
 		sb.WriteString(strings.Join(rowStrs, ", "))
 	}
 
-	if len(b.conflictCols) > 0 {
+	if len(b.conflictCols) > 0 && !mysqlStyleConflict {
 		sb.WriteString(" ON CONFLICT (")
 		colNames := make([]string, len(b.conflictCols))
 
@@ -116,6 +126,17 @@ func (b *InsertBuilder) Render(d dialect.Dialect) (string, []any, error) {
 			}
 			sb.WriteString(strings.Join(sets, ", "))
 		}
+	} else if mysqlStyleConflict && !b.conflictDoNothing {
+		sb.WriteString(" ON DUPLICATE KEY UPDATE ")
+		sets := make([]string, len(b.conflictUpdate))
+		for i, a := range b.conflictUpdate {
+			s, err := r.renderAssignment(a)
+			if err != nil {
+				return "", nil, err
+			}
+			sets[i] = s
+		}
+		sb.WriteString(strings.Join(sets, ", "))
 	}
 
 	if len(b.returning) > 0 {

@@ -110,7 +110,8 @@ func CreateAll[T any](ctx context.Context, db *DB, rows []*T, opts ...WriteOptio
 			}
 		}
 
-		if len(returningFields) == 0 {
+		switch {
+		case len(returningFields) == 0:
 			sqlText, args, err := ib.Render(db.dialect)
 			if err != nil {
 				return err
@@ -118,12 +119,16 @@ func CreateAll[T any](ctx context.Context, db *DB, rows []*T, opts ...WriteOptio
 			if _, err := db.execContext(ctx, "CreateAll", table.GoType.Name(), sqlText, args); err != nil {
 				return err
 			}
-		} else {
+		case db.dialect.SupportsReturning():
 			sqlText, args, err := ib.Returning(retCols...).Render(db.dialect)
 			if err != nil {
 				return err
 			}
 			if err := scanCreateAllReturning[T](ctx, db, table, sqlText, args, chunkRows, returningFields); err != nil {
+				return err
+			}
+		default:
+			if err := createAllWithoutReturning(ctx, db, table, ib, chunkRows, returningFields); err != nil {
 				return err
 			}
 		}
@@ -135,6 +140,34 @@ func CreateAll[T any](ctx context.Context, db *DB, rows []*T, opts ...WriteOptio
 						return fmt.Errorf("pack: AfterInsert hook on %s: %w", table.GoType.Name(), err)
 					}
 				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func createAllWithoutReturning[T any](ctx context.Context, db *DB, table *schema.Table, ib *sqlbuild.InsertBuilder, chunkRows []*T, returningFields []schema.Field) error {
+	sqlText, args, err := ib.Render(db.dialect)
+	if err != nil {
+		return err
+	}
+
+	res, err := db.execContext(ctx, "CreateAll", table.GoType.Name(), sqlText, args)
+	if err != nil {
+		return err
+	}
+
+	firstID, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("pack: CreateAll(%s): LastInsertId: %w", table.GoType.Name(), err)
+	}
+
+	for i, row := range chunkRows {
+		rv := reflect.ValueOf(row).Elem()
+		for _, f := range returningFields {
+			if err := assignInt64(returningDest(row, rv, f), firstID+int64(i)); err != nil {
+				return fmt.Errorf("pack: CreateAll(%s): %w", table.GoType.Name(), err)
 			}
 		}
 	}

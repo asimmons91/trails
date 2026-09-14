@@ -73,6 +73,10 @@ func Create[T any](ctx context.Context, db *DB, row *T, opts ...WriteOption) err
 		return fireAfterInsert(ctx, table, row)
 	}
 
+	if !db.dialect.SupportsReturning() {
+		return createWithoutReturning(ctx, db, table, ib, rv, row, returning)
+	}
+
 	retCols := make([]sqlbuild.Column, len(returning))
 	for i, f := range returning {
 		retCols[i] = sqlbuild.Col(f.Column)
@@ -97,6 +101,77 @@ func Create[T any](ctx context.Context, db *DB, row *T, opts ...WriteOption) err
 
 	dests := make([]any, len(returning))
 	for i, f := range returning {
+		dests[i] = returningDest(row, rv, f)
+	}
+	if err := rows.Scan(dests...); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return fireAfterInsert(ctx, table, row)
+}
+
+func createWithoutReturning(ctx context.Context, db *DB, table *schema.Table, ib *sqlbuild.InsertBuilder, rv reflect.Value, row any, returning []schema.Field) error {
+	sqlText, args, err := ib.Render(db.dialect)
+	if err != nil {
+		return err
+	}
+
+	res, err := db.execContext(ctx, "Create", table.GoType.Name(), sqlText, args)
+	if err != nil {
+		return err
+	}
+
+	var remaining []schema.Field
+	for _, f := range returning {
+		if !f.Options.AutoIncrement {
+			remaining = append(remaining, f)
+			continue
+		}
+
+		id, err := res.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("pack: Create(%s): LastInsertId: %w", table.GoType.Name(), err)
+		}
+		if err := assignInt64(returningDest(row, rv, f), id); err != nil {
+			return fmt.Errorf("pack: Create(%s): %w", table.GoType.Name(), err)
+		}
+	}
+
+	if len(remaining) == 0 {
+		return fireAfterInsert(ctx, table, row)
+	}
+
+	retCols := make([]sqlbuild.Column, len(remaining))
+	for i, f := range remaining {
+		retCols[i] = sqlbuild.Col(f.Column)
+	}
+
+	sqlText, args, err = sqlbuild.Select(sqlbuild.Table{Name: table.Name}).
+		Columns(retCols...).
+		Where(pkPredicateFromRow(table, rv)).
+		Render(db.dialect)
+	if err != nil {
+		return err
+	}
+
+	rows, err := db.queryContext(ctx, "Create", table.GoType.Name(), sqlText, args)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		return fmt.Errorf("pack: Create(%s): follow-up SELECT for default columns produced no row", table.GoType.Name())
+	}
+
+	dests := make([]any, len(remaining))
+	for i, f := range remaining {
 		dests[i] = returningDest(row, rv, f)
 	}
 	if err := rows.Scan(dests...); err != nil {

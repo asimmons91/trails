@@ -10,6 +10,10 @@ type Dialect interface {
 	SupportsILike() bool
 
 	SupportsRowLocking() bool
+
+	SupportsReturning() bool
+
+	SupportsOnConflict() bool
 }
 
 const (

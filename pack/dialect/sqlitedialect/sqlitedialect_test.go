@@ -35,6 +35,14 @@ func TestSQLite_DoesNotSupportRowLocking(t *testing.T) {
 	assert.False(t, New().SupportsRowLocking())
 }
 
+func TestSQLite_SupportsReturning(t *testing.T) {
+	assert.True(t, New().SupportsReturning())
+}
+
+func TestSQLite_SupportsOnConflict(t *testing.T) {
+	assert.True(t, New().SupportsOnConflict())
+}
+
 type fakeCodeErr struct{ code int }
 
 func (e *fakeCodeErr) Error() string { return "driver error" }

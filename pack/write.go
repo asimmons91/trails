@@ -100,3 +100,35 @@ func pkPredicate(table *schema.Table, id any, alias string) (sqlbuild.Predicate,
 
 	return sqlbuild.And(preds...), nil
 }
+
+func pkPredicateFromRow(table *schema.Table, rv reflect.Value) sqlbuild.Predicate {
+	preds := make([]sqlbuild.Predicate, len(table.PK))
+	for i, f := range table.PK {
+		preds[i] = sqlbuild.Eq(sqlbuild.Col(f.Column), rv.FieldByIndex(f.Index).Interface())
+	}
+
+	if len(preds) == 1 {
+		return preds[0]
+	}
+
+	return sqlbuild.And(preds...)
+}
+
+func assignInt64(dest any, v int64) error {
+	rv := reflect.ValueOf(dest)
+	if rv.Kind() != reflect.Pointer {
+		return fmt.Errorf("pack: internal: LastInsertId destination %T is not a pointer", dest)
+	}
+
+	elem := rv.Elem()
+	switch elem.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		elem.SetInt(v)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		elem.SetUint(uint64(v))
+	default:
+		return fmt.Errorf("pack: internal: LastInsertId destination has unsupported kind %s", elem.Kind())
+	}
+
+	return nil
+}

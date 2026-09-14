@@ -27,6 +27,14 @@ func TestPostgres_Name(t *testing.T) {
 	assert.Equal(t, "postgres", New().Name())
 }
 
+func TestPostgres_SupportsReturning(t *testing.T) {
+	assert.True(t, New().SupportsReturning())
+}
+
+func TestPostgres_SupportsOnConflict(t *testing.T) {
+	assert.True(t, New().SupportsOnConflict())
+}
+
 type fakeSQLStateErr struct{ code string }
 
 func (e *fakeSQLStateErr) Error() string    { return "driver error " + e.code }

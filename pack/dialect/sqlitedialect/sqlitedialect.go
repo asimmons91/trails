@@ -26,6 +26,10 @@ func (SQLite) SupportsILike() bool { return false }
 
 func (SQLite) SupportsRowLocking() bool { return false }
 
+func (SQLite) SupportsReturning() bool { return true }
+
+func (SQLite) SupportsOnConflict() bool { return true }
+
 func (SQLite) Classify(err error) (string, bool) {
 	var ce interface{ Code() int }
 	if !errors.As(err, &ce) {

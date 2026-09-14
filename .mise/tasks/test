@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Test Workspace"
+
+set -e
+go test ./...
+for d in pack/driver/sqlite pack/driver/postgres pack/driver/mysql; do
+  (cd "$d" && go test ./...)
+done
