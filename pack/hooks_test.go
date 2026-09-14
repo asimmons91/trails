@@ -74,7 +74,7 @@ func TestUpdate_BeforeAfterUpdateHooks_FireInOrder(t *testing.T) {
 	db, fake := newTestDB()
 	fake.Enqueue(testdb.Result{RowsAffected: 1})
 
-	row := &testHookedItem{Model: Model[int64]{ID: 1}, Name: "widget"}
+	row := &testHookedItem{ID: 1, Name: "widget"}
 	err := Update(context.Background(), db, row)
 	require.NoError(t, err)
 
@@ -88,7 +88,7 @@ func TestUpdate_BeforeUpdateHookError_AbortsBeforeAnySQL(t *testing.T) {
 	resetHookLog()
 	db, fake := newTestDB()
 
-	row := &testHookedItem{Model: Model[int64]{ID: 1}, Name: "widget", FailHook: "BeforeUpdate"}
+	row := &testHookedItem{ID: 1, Name: "widget", FailHook: "BeforeUpdate"}
 	err := Update(context.Background(), db, row)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "BeforeUpdate hook on testHookedItem")
