@@ -99,6 +99,39 @@ func ExampleOnConflict() {
 	// <nil>
 }
 
+func adultAccounts(q *Query[testAccount]) *Query[testAccount] {
+	return q.Where(accountCol.Email.IsNotNull())
+}
+
+func withAccountEmail(email string) Scope[testAccount] {
+	return func(q *Query[testAccount]) *Query[testAccount] {
+		return q.Where(accountCol.Email.Eq(email))
+	}
+}
+
+func ExampleQuery_Scopes() {
+	fake := testdb.New()
+	db := Open(fake.Open(), pgdialect.New())
+
+	fake.Enqueue(testdb.Result{
+		Columns: []string{"id", "email", "created_at", "nickname"},
+		Rows: [][]driver.Value{
+			testdb.Row(int64(1), "ada@example.com", time.Time{}, ""),
+		},
+	})
+
+	accounts, err := Of[testAccount](db).
+		Scopes(adultAccounts, withAccountEmail("ada@example.com")).
+		Find(context.Background())
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(accounts[0].Email)
+	// Output:
+	// ada@example.com
+}
+
 func ExampleQuery_Rows() {
 	fake := testdb.New()
 	db := Open(fake.Open(), pgdialect.New())

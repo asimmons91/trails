@@ -72,6 +72,17 @@ func (q *Query[T]) Or(p Predicate) *Query[T] {
 	return nq
 }
 
+// Scope is a reusable, composable query modifier, applied via Query[T].Scopes.
+type Scope[T any] func(*Query[T]) *Query[T]
+
+func (q *Query[T]) Scopes(scopes ...Scope[T]) *Query[T] {
+	nq := q
+	for _, s := range scopes {
+		nq = s(nq)
+	}
+	return nq
+}
+
 func (q *Query[T]) Order(terms ...OrderTerm[T]) *Query[T] {
 	nq := q.clone()
 	raw := make([]sqlbuild.OrderTerm, len(terms))
