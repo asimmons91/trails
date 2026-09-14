@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Lint Workspace"
+
+set -e
+golangci-lint run ./...
+for d in pack/driver/sqlite pack/driver/postgres pack/driver/mysql; do
+  (cd "$d" && golangci-lint run ./...)
+done

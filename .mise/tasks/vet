@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Vet Workspace"
+
+set -e
+go vet ./...
+for d in pack/driver/sqlite pack/driver/postgres pack/driver/mysql; do
+  (cd "$d" && go vet ./...)
+done
