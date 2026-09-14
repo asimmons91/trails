@@ -1,0 +1,22 @@
+[tools]
+go = "1.27.1"
+golangci-lint = "latest"
+
+[tasks.test]
+description = "Test Project"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Lint Project"
+run = "golangci-lint run ./..."
+
+[tasks.vet]
+description = "Vet Project"
+run = "go vet ./..."
+
+[tasks.check]
+description = "Run all checks for project"
+depends = ["fmt", "vet", "lint", "test"]
+
+[settings]
+jobs = 1

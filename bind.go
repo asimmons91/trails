@@ -1,0 +1,201 @@
+package trails
+
+import (
+	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"mime"
+	"reflect"
+	"strconv"
+)
+
+type Binder interface {
+	Bind(c *Context, target any) error
+}
+
+type Unmarshaler interface {
+	UnmarshalParam(value string) error
+}
+
+type bindLookupFunc func(name string) ([]string, bool)
+
+type DefaultBinder struct{}
+
+func (d *DefaultBinder) Bind(c *Context, target any) error {
+	if err := BindPathParams(c, target); err != nil {
+		return err
+	}
+
+	if err := BindQueryParams(c, target); err != nil {
+		return err
+	}
+
+	if c.Request().Body == nil || c.Request().ContentLength == 0 {
+		return nil
+	}
+
+	return BindBody(c, target)
+}
+
+func BindPathParams(c *Context, dst any) error {
+	return bindTagSource(dst, "param", func(name string) ([]string, bool) {
+		v := c.Request().PathValue(name)
+		if v == "" {
+			return nil, false
+		}
+		return []string{v}, true
+	})
+}
+
+func BindQueryParams(c *Context, dst any) error {
+	values := c.Request().URL.Query()
+	return bindTagSource(dst, "query", func(name string) ([]string, bool) {
+		v, ok := values[name]
+		return v, ok && len(v) > 0
+	})
+}
+
+func BindBody(c *Context, dst any) error {
+	ctype := c.Request().Header.Get("Content-Type")
+	mediaType, _, err := mime.ParseMediaType(ctype)
+	if err != nil {
+		return fmt.Errorf("bind: invalid Content-Type %q: %w", ctype, err)
+	}
+
+	switch mediaType {
+	case "application/json":
+		dec := json.NewDecoder(c.Request().Body)
+		if err := dec.Decode(dst); err != nil {
+			return fmt.Errorf("bind: decoding JSON body: %w", err)
+		}
+
+	case "application/xml", "text/xml":
+		dec := xml.NewDecoder(c.Request().Body)
+		if err := dec.Decode(dst); err != nil {
+			return fmt.Errorf("bin: decoding XML body: %w", err)
+		}
+
+	case "application/x-www-form-urlencoded":
+		if err := c.Request().ParseForm(); err != nil {
+			return fmt.Errorf("bind: parsing form: %w", err)
+		}
+		return bindTagSource(dst, "form", func(name string) ([]string, bool) {
+			v, ok := c.Request().Form[name]
+			return v, ok && len(v) > 0
+		})
+
+	case "multipart/form-data":
+		if err := c.Request().ParseMultipartForm(32 << 20); err != nil {
+			return fmt.Errorf("bind: parsing multipart form: %w", err)
+		}
+		return bindTagSource(dst, "form", func(name string) ([]string, bool) {
+			v, ok := c.Request().MultipartForm.Value[name]
+			return v, ok && len(v) > 0
+		})
+	default:
+		return fmt.Errorf("bind: unsupported Content-Type %q", mediaType)
+	}
+
+	return nil
+}
+
+func bindTagSource(dst any, tag string, lookup bindLookupFunc) error {
+	rv := reflect.ValueOf(dst)
+	if rv.Kind() != reflect.Pointer || rv.IsNil() {
+		return fmt.Errorf("bind: destination must be a non-nil pointer to a struct")
+	}
+	rv = rv.Elem()
+	if rv.Kind() != reflect.Struct {
+		return fmt.Errorf("bind: destination must point to a struct")
+	}
+
+	rt := rv.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		sf := rt.Field(i)
+		if !sf.IsExported() {
+			continue
+		}
+
+		name, ok := sf.Tag.Lookup(tag)
+		if !ok || name == "" || name == "-" {
+			continue
+		}
+
+		values, found := lookup(name)
+		if !found {
+			continue
+		}
+		if err := setField(rv.Field(i), values); err != nil {
+			return fmt.Errorf("bind: field %q (tag %s=%q): %w", sf.Name, tag, name, err)
+		}
+	}
+	return nil
+}
+
+func setField(field reflect.Value, values []string) error {
+	if !field.CanSet() || len(values) == 0 {
+		return nil
+	}
+
+	if field.Kind() == reflect.Slice {
+		out := reflect.MakeSlice(field.Type(), len(values), len(values))
+		for i, v := range values {
+			if err := setScalar(out.Index(i), v); err != nil {
+				return err
+			}
+		}
+		field.Set(out)
+		return nil
+	}
+
+	return setScalar(field, values[0])
+}
+
+func setScalar(field reflect.Value, value string) error {
+	if field.Kind() == reflect.Pointer {
+		if field.IsNil() {
+			field.Set(reflect.New(field.Type().Elem()))
+		}
+
+		return setScalar(field.Elem(), value)
+	}
+
+	if field.CanAddr() {
+		if u, ok := field.Addr().Interface().(Unmarshaler); ok {
+			return u.UnmarshalParam(value)
+		}
+	}
+
+	switch field.Kind() {
+	case reflect.String:
+		field.SetString(value)
+	case reflect.Bool:
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid bool %q: %w", value, err)
+		}
+		field.SetBool(b)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(value, 10, field.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("invalid integer %q: %w", value, err)
+		}
+		field.SetInt(n)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n, err := strconv.ParseUint(value, 10, field.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("invalid unsigned integer %q: %w", value, err)
+		}
+		field.SetUint(n)
+	case reflect.Float32, reflect.Float64:
+		n, err := strconv.ParseFloat(value, field.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("invalid float %q: %w", value, err)
+		}
+		field.SetFloat(n)
+	default:
+		return fmt.Errorf("unsupported field kind %s (implement trails.Unmarshaler for custom types)", field.Kind())
+	}
+
+	return nil
+}
