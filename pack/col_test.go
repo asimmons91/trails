@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"testing"
 
-	"github.com/asimmons91/trails/pack/dialect/pgdialect"
 	"github.com/asimmons91/trails/pack/internal/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,8 @@ import (
 
 func newTestDB() (*DB, *testdb.FakeDB) {
 	fake := testdb.New()
-	db := Open(fake.Open(), pgdialect.New())
+	d := fakeSQLStateDecodingDialect{}
+	db := Open(fake.Open(), d, WithErrorDecoder(d))
 	return db, fake
 }
 

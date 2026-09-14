@@ -22,13 +22,11 @@ func (Driver) Open(dsn string) (*sql.DB, error) {
 	return sql.Open("mysql", dsn)
 }
 
-func (Driver) Dialect() dialect.Dialect { return mysqlDialect{mysqldialect.New()} }
+func (Driver) Dialect() dialect.Dialect { return mysqldialect.New() }
 
-type mysqlDialect struct{ mysqldialect.MySQL }
+var _ driver.ErrorDecoder = Driver{}
 
-var _ dialect.ErrorDecoder = mysqlDialect{}
-
-func (mysqlDialect) Classify(err error) (string, bool) {
+func (Driver) Classify(err error) (string, bool) {
 	var me *sqlmysql.MySQLError
 	if !errors.As(err, &me) {
 		return "", false
@@ -36,13 +34,13 @@ func (mysqlDialect) Classify(err error) (string, bool) {
 
 	switch me.Number {
 	case 1062: // ER_DUP_ENTRY
-		return dialect.CodeUnique, true
+		return driver.CodeUnique, true
 	case 1452: // ER_NO_REFERENCED_ROW_2
-		return dialect.CodeForeignKey, true
+		return driver.CodeForeignKey, true
 	case 1048: // ER_BAD_NULL_ERROR
-		return dialect.CodeNotNull, true
+		return driver.CodeNotNull, true
 	case 3819: // ER_CHECK_CONSTRAINT_VIOLATED (MySQL 8.0.16+)
-		return dialect.CodeCheck, true
+		return driver.CodeCheck, true
 	default:
 		return "", false
 	}

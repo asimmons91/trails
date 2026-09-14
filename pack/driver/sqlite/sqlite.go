@@ -2,11 +2,12 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/asimmons91/trails/pack/dialect"
 	"github.com/asimmons91/trails/pack/dialect/sqlitedialect"
 	"github.com/asimmons91/trails/pack/driver"
-	_ "modernc.org/sqlite"
+	sqlitedriver "modernc.org/sqlite"
 )
 
 type Driver struct{}
@@ -22,3 +23,24 @@ func (Driver) Open(dsn string) (*sql.DB, error) {
 }
 
 func (Driver) Dialect() dialect.Dialect { return sqlitedialect.New() }
+
+var _ driver.ErrorDecoder = Driver{}
+
+func (Driver) Classify(err error) (string, bool) {
+	var se *sqlitedriver.Error
+	if !errors.As(err, &se) {
+		return "", false
+	}
+	switch se.Code() {
+	case 2067, 1555: // SQLITE_CONSTRAINT_UNIQUE, SQLITE_CONSTRAINT_PRIMARYKEY
+		return driver.CodeUnique, true
+	case 787: // SQLITE_CONSTRAINT_FOREIGNKEY
+		return driver.CodeForeignKey, true
+	case 1299: // SQLITE_CONSTRAINT_NOTNULL
+		return driver.CodeNotNull, true
+	case 275: // SQLITE_CONSTRAINT_CHECK
+		return driver.CodeCheck, true
+	default:
+		return "", false
+	}
+}

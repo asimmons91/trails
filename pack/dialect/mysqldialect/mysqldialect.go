@@ -6,6 +6,8 @@ import (
 	"github.com/asimmons91/trails/pack/dialect"
 )
 
+// MySQL implements dialect.Dialect. Error classification lives in
+// pack/driver/mysql, not here - see driver.ErrorDecoder.
 type MySQL struct{}
 
 var _ dialect.Dialect = MySQL{}

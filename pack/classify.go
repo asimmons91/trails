@@ -1,14 +1,14 @@
 package pack
 
-import "github.com/asimmons91/trails/pack/dialect"
+import "github.com/asimmons91/trails/pack/driver"
 
 // noopErrorDecoder is used when the Dialect passed to Open doesn't itself
-// implement dialect.ErrorDecoder.
+// implement driver.ErrorDecoder.
 type noopErrorDecoder struct{}
 
 func (noopErrorDecoder) Classify(err error) (string, bool) { return "", false }
 
-func WithErrorDecoder(d dialect.ErrorDecoder) Option {
+func WithErrorDecoder(d driver.ErrorDecoder) Option {
 	return func(o *dbOptions) {
 		o.errDecoder = d
 	}
@@ -25,7 +25,7 @@ func classifyError(db *DB, op, model string, err error) error {
 	}
 
 	var constraint, table, column string
-	if dd, ok := db.opts.errDecoder.(dialect.DetailedErrorDecoder); ok {
+	if dd, ok := db.opts.errDecoder.(driver.DetailedErrorDecoder); ok {
 		constraint, table, column = dd.Detail(err)
 	}
 
@@ -39,13 +39,13 @@ func classifyError(db *DB, op, model string, err error) error {
 	}
 
 	switch code {
-	case dialect.CodeUnique:
+	case driver.CodeUnique:
 		return &ErrUniqueViolation{base}
-	case dialect.CodeForeignKey:
+	case driver.CodeForeignKey:
 		return &ErrForeignKeyViolation{base}
-	case dialect.CodeNotNull:
+	case driver.CodeNotNull:
 		return &ErrNotNullViolation{base}
-	case dialect.CodeCheck:
+	case driver.CodeCheck:
 		return &ErrCheckViolation{base}
 	default:
 		return err

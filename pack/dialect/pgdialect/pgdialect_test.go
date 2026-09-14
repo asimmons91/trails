@@ -1,10 +1,8 @@
 package pgdialect
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/asimmons91/trails/pack/dialect"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,25 +31,4 @@ func TestPostgres_SupportsReturning(t *testing.T) {
 
 func TestPostgres_SupportsOnConflict(t *testing.T) {
 	assert.True(t, New().SupportsOnConflict())
-}
-
-type fakeSQLStateErr struct{ code string }
-
-func (e *fakeSQLStateErr) Error() string    { return "driver error " + e.code }
-func (e *fakeSQLStateErr) SQLState() string { return e.code }
-
-func TestPostgres_Classify_RecognisesSQLStateError(t *testing.T) {
-	code, ok := New().Classify(&fakeSQLStateErr{code: "23505"})
-	assert.True(t, ok)
-	assert.Equal(t, dialect.CodeUnique, code)
-}
-
-func TestPostgres_Classify_UnmappedSQLState_ReturnsFalse(t *testing.T) {
-	_, ok := New().Classify(&fakeSQLStateErr{code: "42601"}) // syntax error, not a constraint code
-	assert.False(t, ok)
-}
-
-func TestPostgres_Classify_UnrecognisedError_ReturnsFalse(t *testing.T) {
-	_, ok := New().Classify(errors.New("boom"))
-	assert.False(t, ok)
 }

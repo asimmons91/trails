@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/asimmons91/trails/pack/dialect"
+	"github.com/asimmons91/trails/pack/driver"
 )
 
 type dbConn interface {
@@ -20,7 +21,7 @@ type txBeginner interface {
 type dbOptions struct {
 	queryHooks      []QueryHook
 	exposeQueryArgs bool
-	errDecoder      dialect.ErrorDecoder
+	errDecoder      driver.ErrorDecoder
 }
 
 type Option func(o *dbOptions)
@@ -36,9 +37,6 @@ type DB struct {
 
 func Open(db *sql.DB, d dialect.Dialect, opts ...Option) *DB {
 	o := &dbOptions{errDecoder: noopErrorDecoder{}}
-	if ed, ok := d.(dialect.ErrorDecoder); ok {
-		o.errDecoder = ed
-	}
 	for _, opt := range opts {
 		opt(o)
 	}

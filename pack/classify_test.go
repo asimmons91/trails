@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/asimmons91/trails/pack/dialect"
 	"github.com/asimmons91/trails/pack/dialect/pgdialect"
 	"github.com/asimmons91/trails/pack/dialect/sqlitedialect"
+	"github.com/asimmons91/trails/pack/driver"
 	"github.com/asimmons91/trails/pack/internal/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +17,29 @@ type fakeSQLStateErr struct{ code string }
 
 func (e *fakeSQLStateErr) Error() string    { return "driver error " + e.code }
 func (e *fakeSQLStateErr) SQLState() string { return e.code }
+
+type fakeSQLStateDecodingDialect struct{ pgdialect.Postgres }
+
+func (fakeSQLStateDecodingDialect) Classify(err error) (string, bool) {
+	var se interface{ SQLState() string }
+	if !errors.As(err, &se) {
+		return "", false
+	}
+	switch se.SQLState() {
+	case "23505":
+		return driver.CodeUnique, true
+	case "23503":
+		return driver.CodeForeignKey, true
+	case "23502":
+		return driver.CodeNotNull, true
+	case "23514":
+		return driver.CodeCheck, true
+	default:
+		return "", false
+	}
+}
+
+var _ driver.ErrorDecoder = fakeSQLStateDecodingDialect{}
 
 func TestCreate_UniqueViolation_ClassifiedAsTypedError(t *testing.T) {
 	db, fake := newTestDB()
@@ -100,14 +123,14 @@ func TestClassifyError_UnrecognisedDriver_DegradesToOriginalErrorUnchanged(t *te
 type detailingDecoder struct{}
 
 func (detailingDecoder) Classify(err error) (string, bool) {
-	return dialect.CodeUnique, true
+	return driver.CodeUnique, true
 }
 
 func (detailingDecoder) Detail(err error) (constraint, table, column string) {
 	return "widgets_count_key", "widgets", "count"
 }
 
-var _ dialect.DetailedErrorDecoder = detailingDecoder{}
+var _ driver.DetailedErrorDecoder = detailingDecoder{}
 
 func TestWithErrorDecoder_DetailedDecoder_PopulatesConstraintTableColumn(t *testing.T) {
 	fake := testdb.New()
@@ -143,9 +166,25 @@ type fakeSQLiteCodeErr struct{ code int }
 func (e *fakeSQLiteCodeErr) Error() string { return "driver error" }
 func (e *fakeSQLiteCodeErr) Code() int     { return e.code }
 
-func TestOpen_WithSQLiteDialect_AutoDetectsErrorDecoder(t *testing.T) {
+type fakeSQLiteCodeDecodingDialect struct{ sqlitedialect.SQLite }
+
+func (fakeSQLiteCodeDecodingDialect) Classify(err error) (string, bool) {
+	var ce interface{ Code() int }
+	if !errors.As(err, &ce) {
+		return "", false
+	}
+	if ce.Code() == 2067 { // SQLITE_CONSTRAINT_UNIQUE
+		return driver.CodeUnique, true
+	}
+	return "", false
+}
+
+var _ driver.ErrorDecoder = fakeSQLiteCodeDecodingDialect{}
+
+func TestOpen_WithExplicitErrorDecoder_ClassifiesSQLiteStyleCodes(t *testing.T) {
 	fake := testdb.New()
-	db := Open(fake.Open(), sqlitedialect.New())
+	d := fakeSQLiteCodeDecodingDialect{}
+	db := Open(fake.Open(), d, WithErrorDecoder(d))
 	driverErr := &fakeSQLiteCodeErr{code: 2067} // SQLITE_CONSTRAINT_UNIQUE
 	fake.Enqueue(testdb.Result{Err: driverErr})
 
