@@ -2,7 +2,7 @@
 #MISE description="Test Workspace"
 
 set -e
-go test ./...
+go test ./... -race
 for d in pack/driver/sqlite pack/driver/postgres pack/driver/mysql; do
-  (cd "$d" && go test ./...)
+  (cd "$d" && go test ./... -race)
 done
