@@ -24,6 +24,7 @@ func (fakeDialect) SupportsILike() bool      { return true }
 func (fakeDialect) SupportsRowLocking() bool { return true }
 func (fakeDialect) SupportsReturning() bool  { return true }
 func (fakeDialect) SupportsOnConflict() bool { return true }
+func (fakeDialect) SupportsSavepoints() bool { return true }
 
 func TestRender_DifferentDialect_ChangesSyntaxOnlyNotStructure(t *testing.T) {
 	build := func(d dialect.Dialect) (string, []any, error) {

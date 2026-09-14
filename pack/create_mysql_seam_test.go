@@ -28,6 +28,7 @@ func (fakeMySQLDialect) SupportsILike() bool      { return false }
 func (fakeMySQLDialect) SupportsRowLocking() bool { return true }
 func (fakeMySQLDialect) SupportsReturning() bool  { return false }
 func (fakeMySQLDialect) SupportsOnConflict() bool { return false }
+func (fakeMySQLDialect) SupportsSavepoints() bool { return true }
 
 func newMySQLShapedTestDB() (*DB, *testdb.FakeDB) {
 	fake := testdb.New()

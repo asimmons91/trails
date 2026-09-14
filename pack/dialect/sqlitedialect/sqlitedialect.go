@@ -30,6 +30,8 @@ func (SQLite) SupportsReturning() bool { return true }
 
 func (SQLite) SupportsOnConflict() bool { return true }
 
+func (SQLite) SupportsSavepoints() bool { return true }
+
 func (SQLite) Classify(err error) (string, bool) {
 	var ce interface{ Code() int }
 	if !errors.As(err, &ce) {

@@ -27,3 +27,5 @@ func (MySQL) SupportsRowLocking() bool { return true }
 func (MySQL) SupportsReturning() bool { return false }
 
 func (MySQL) SupportsOnConflict() bool { return false }
+
+func (MySQL) SupportsSavepoints() bool { return true }

@@ -32,6 +32,8 @@ func (Postgres) SupportsReturning() bool { return true }
 
 func (Postgres) SupportsOnConflict() bool { return true }
 
+func (Postgres) SupportsSavepoints() bool { return true }
+
 func (Postgres) Classify(err error) (string, bool) {
 	var se interface{ SQLState() string }
 	if !errors.As(err, &se) {

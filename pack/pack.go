@@ -3,6 +3,7 @@ package pack
 import (
 	"context"
 	"database/sql"
+	"sync/atomic"
 
 	"github.com/asimmons91/trails/pack/dialect"
 )
@@ -25,11 +26,12 @@ type dbOptions struct {
 type Option func(o *dbOptions)
 
 type DB struct {
-	conn     dbConn
-	beginner txBeginner
-	dialect  dialect.Dialect
-	opts     *dbOptions
-	tx       *sql.Tx
+	conn         dbConn
+	beginner     txBeginner
+	dialect      dialect.Dialect
+	opts         *dbOptions
+	scope        txScope       // nil outside a transaction
+	savepointSeq *atomic.Int64 // shared across an entire tx tree; nil outside a transaction
 }
 
 func Open(db *sql.DB, d dialect.Dialect, opts ...Option) *DB {

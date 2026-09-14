@@ -23,6 +23,7 @@ func (mysqlShapedFake) SupportsILike() bool      { return false }
 func (mysqlShapedFake) SupportsRowLocking() bool { return true }
 func (mysqlShapedFake) SupportsReturning() bool  { return false }
 func (mysqlShapedFake) SupportsOnConflict() bool { return false }
+func (mysqlShapedFake) SupportsSavepoints() bool { return true }
 
 var mysqlFake = mysqlShapedFake{}
 

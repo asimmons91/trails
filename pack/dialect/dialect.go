@@ -14,6 +14,8 @@ type Dialect interface {
 	SupportsReturning() bool
 
 	SupportsOnConflict() bool
+
+	SupportsSavepoints() bool
 }
 
 const (
