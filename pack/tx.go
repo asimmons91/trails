@@ -100,3 +100,27 @@ func (db *DB) Rollback() error {
 
 	return db.scope.rollback(context.Background())
 }
+
+func (db *DB) InTransaction() bool {
+	return db.scope != nil
+}
+
+func (db *DB) PinnedConn(ctx context.Context, fn func(pinned *DB) error) error {
+	pool, ok := db.beginner.(interface {
+		Conn(ctx context.Context) (*sql.Conn, error)
+	})
+	if !ok {
+		return ErrPinnedConnUnsupported
+	}
+
+	conn, err := pool.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	pinned := &DB{conn: conn, beginner: conn, dialect: db.dialect, opts: db.opts, savepointSeq: new(atomic.Int64)}
+	return fn(pinned)
+}

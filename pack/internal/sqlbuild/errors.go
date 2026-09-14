@@ -44,3 +44,19 @@ type ErrReturningUnsupportedByDialect struct {
 func (e *ErrReturningUnsupportedByDialect) Error() string {
 	return fmt.Sprintf("sqlbuild: %s does not support INSERT ... RETURNING", e.Dialect)
 }
+
+type ErrDDLUnsupportedByDialect struct {
+	Dialect string
+}
+
+func (d *ErrDDLUnsupportedByDialect) Error() string {
+	return fmt.Sprintf("sqlbuild: %s does not implement dialect.DDL", d.Dialect)
+}
+
+type ErrConstraintsUnsupportedByDialect struct {
+	Dialect string
+}
+
+func (c *ErrConstraintsUnsupportedByDialect) Error() string {
+	return fmt.Sprintf("sqlbuild: %s does not support adding or dropping constraints after table creation", c.Dialect)
+}

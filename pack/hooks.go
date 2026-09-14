@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/asimmons91/trails/pack/dialect"
 )
 
 type BeforeInserter interface {
@@ -109,4 +111,14 @@ func (db *DB) execContext(ctx context.Context, op, model, sqlText string, args [
 	ev.Err = err
 	db.afterQuery(ctx, ev)
 	return res, err
+}
+
+func (db *DB) Dialect() dialect.Dialect { return db.dialect }
+
+func (db *DB) ExecContext(ctx context.Context, op, model, sqlText string, args []any) (sql.Result, error) {
+	return db.execContext(ctx, op, model, sqlText, args)
+}
+
+func (db *DB) QueryContext(ctx context.Context, op, model, sqlText string, args []any) (*sql.Rows, error) {
+	return db.queryContext(ctx, op, model, sqlText, args)
 }
