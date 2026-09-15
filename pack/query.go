@@ -30,6 +30,7 @@ type Query[T any] struct {
 	offset     *int64
 	forUpdate  bool
 	forShare   bool
+	skipLocked bool
 	preloads   []preloadRunner
 	skipHooks  bool
 }
@@ -153,6 +154,12 @@ func (q *Query[T]) ForShare() *Query[T] {
 	return nq
 }
 
+func (q *Query[T]) SkipLocked() *Query[T] {
+	nq := q.clone()
+	nq.skipLocked = true
+	return nq
+}
+
 func (q *Query[T]) SkipHooks() *Query[T] {
 	nq := q.clone()
 	nq.skipHooks = true
@@ -236,6 +243,10 @@ func (q *Query[T]) buildSelect() *sqlbuild.SelectBuilder {
 
 	if q.forShare {
 		b = b.ForShare()
+	}
+
+	if q.skipLocked {
+		b = b.SkipLocked()
 	}
 
 	return b
