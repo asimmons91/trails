@@ -3,6 +3,7 @@
 
 set -e
 go vet ./...
-for d in pack/driver/sqlite pack/driver/postgres pack/driver/mysql; do
+mapfile -t submodules < <(find . -mindepth 2 -name go.mod | xargs -n1 dirname | sed 's|^\./||' | sort)
+for d in "${submodules[@]}"; do
   (cd "$d" && go vet ./...)
 done

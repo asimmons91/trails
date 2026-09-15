@@ -29,6 +29,12 @@ func (e *ErrILikeUnsupportedByDialect) Error() string {
 	return fmt.Sprintf("sqlbuild: %s does not support ILIKE statements", e.Dialect)
 }
 
+type ErrSkipLockedRequiresLockClause struct{}
+
+func (e *ErrSkipLockedRequiresLockClause) Error() string {
+	return "sqlbuild: SKIP LOCKED requires FOR UPDATE or FOR SHARE"
+}
+
 type ErrRowLockingUnsupportedByDialect struct {
 	Dialect string
 }

@@ -14,6 +14,19 @@ func (m Manifest) Path(logical string) (string, bool) {
 	return p, ok
 }
 
+func MergeManifests(manifests ...Manifest) Manifest {
+	merged := Manifest{}
+	for _, m := range manifests {
+		for k, v := range m {
+			if _, exists := merged[k]; !exists {
+				merged[k] = v
+			}
+		}
+	}
+
+	return merged
+}
+
 func LoadManifest(fsys fs.FS, path string) (Manifest, error) {
 	data, err := fs.ReadFile(fsys, path)
 	if err != nil {

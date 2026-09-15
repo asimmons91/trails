@@ -452,6 +452,30 @@ func TestSelect_ForUpdateAndForShare_IsError(t *testing.T) {
 	require.IsType(t, &ErrConflictingLockClause{}, err)
 }
 
+func TestSelect_ForUpdateSkipLocked(t *testing.T) {
+	sql, _, err := Select(users).ForUpdate().SkipLocked().Render(pg)
+	require.NoError(t, err)
+	require.Equal(t, `SELECT * FROM "users" AS "u" FOR UPDATE SKIP LOCKED`, sql)
+}
+
+func TestSelect_ForShareSkipLocked(t *testing.T) {
+	sql, _, err := Select(users).ForShare().SkipLocked().Render(pg)
+	require.NoError(t, err)
+	require.Equal(t, `SELECT * FROM "users" AS "u" FOR SHARE SKIP LOCKED`, sql)
+}
+
+func TestSelect_SkipLockedWithoutLockClause_IsError(t *testing.T) {
+	_, _, err := Select(users).SkipLocked().Render(pg)
+	require.Error(t, err)
+	require.IsType(t, &ErrSkipLockedRequiresLockClause{}, err)
+}
+
+func TestSelect_ForUpdateSkipLocked_UnsupportedBySQLite(t *testing.T) {
+	_, _, err := Select(users).ForUpdate().SkipLocked().Render(sqlite)
+	require.Error(t, err)
+	require.IsType(t, &ErrRowLockingUnsupportedByDialect{}, err)
+}
+
 func TestSelect_SelectRaw_AppendsToColumnList(t *testing.T) {
 	for _, tc := range []dialectCase{
 		{"Postgres", pg, `SELECT "id", count(*) OVER () FROM "users" AS "u"`},

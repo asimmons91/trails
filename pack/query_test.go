@@ -207,6 +207,26 @@ func TestQuery_WhereRaw(t *testing.T) {
 	assert.Equal(t, []any{18}, executed.Args)
 }
 
+func TestQuery_ForUpdateSkipLocked(t *testing.T) {
+	db, fake := newTestDB()
+	fake.Enqueue(testdb.Result{Columns: []string{"id", "email", "age"}})
+
+	_, err := Of[testUser](db).ForUpdate().SkipLocked().Find(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		`SELECT "users"."id", "users"."email", "users"."age" FROM "users" AS "users" FOR UPDATE SKIP LOCKED`,
+		fake.Executed()[0].SQL)
+}
+
+func TestQuery_SkipLockedWithoutLockClause_IsError(t *testing.T) {
+	db, fake := newTestDB()
+
+	_, err := Of[testUser](db).SkipLocked().Find(context.Background())
+	require.Error(t, err)
+	assert.Empty(t, fake.Executed(), "should fail to render before reaching the database")
+}
+
 func TestQuery_SelectRaw(t *testing.T) {
 	db, fake := newTestDB()
 	fake.Enqueue(testdb.Result{Columns: []string{"id", "email", "age", "cnt"}})

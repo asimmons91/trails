@@ -8,19 +8,20 @@ import (
 )
 
 type SelectBuilder struct {
-	table     Table
-	joins     []Join
-	distinct  bool
-	columns   []Column
-	selectRaw []string
-	where     Predicate
-	groupBy   []Column
-	having    Predicate
-	order     []OrderTerm
-	limit     *int64
-	offset    *int64
-	forUpdate bool
-	forShare  bool
+	table      Table
+	joins      []Join
+	distinct   bool
+	columns    []Column
+	selectRaw  []string
+	where      Predicate
+	groupBy    []Column
+	having     Predicate
+	order      []OrderTerm
+	limit      *int64
+	offset     *int64
+	forUpdate  bool
+	forShare   bool
+	skipLocked bool
 }
 
 func Select(t Table) *SelectBuilder {
@@ -110,9 +111,19 @@ func (b *SelectBuilder) ForShare() *SelectBuilder {
 	return nb
 }
 
+func (b *SelectBuilder) SkipLocked() *SelectBuilder {
+	nb := b.clone()
+	nb.skipLocked = true
+	return nb
+}
+
 func (b *SelectBuilder) Render(d dialect.Dialect) (string, []any, error) {
 	if b.forUpdate && b.forShare {
 		return "", nil, &ErrConflictingLockClause{}
+	}
+
+	if b.skipLocked && !b.forUpdate && !b.forShare {
+		return "", nil, &ErrSkipLockedRequiresLockClause{}
 	}
 
 	if (b.forUpdate || b.forShare) && !d.SupportsRowLocking() {
@@ -200,6 +211,10 @@ func (b *SelectBuilder) Render(d dialect.Dialect) (string, []any, error) {
 		sb.WriteString(" FOR UPDATE")
 	} else if b.forShare {
 		sb.WriteString(" FOR SHARE")
+	}
+
+	if b.skipLocked {
+		sb.WriteString(" SKIP LOCKED")
 	}
 
 	return sb.String(), r.args, nil
