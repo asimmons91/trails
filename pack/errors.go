@@ -7,6 +7,8 @@ import (
 
 var ErrNoRows = fmt.Errorf("pack: no rows in result set: %w", sql.ErrNoRows)
 
+var ErrPinnedConnUnsupported = fmt.Errorf("pack: PinnedConn: underlying connection source does not support connection pinning")
+
 type ErrUintOverflow struct {
 	Model  string
 	Field  string

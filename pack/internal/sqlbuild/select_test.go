@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/asimmons91/trails/pack/dialect"
+	"github.com/asimmons91/trails/pack/dialect/mysqldialect"
 	"github.com/asimmons91/trails/pack/dialect/pgdialect"
 	"github.com/asimmons91/trails/pack/dialect/sqlitedialect"
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,7 @@ import (
 
 var pg = pgdialect.New()
 var sqlite = sqlitedialect.New()
+var mysql = mysqldialect.New()
 
 var users = Table{Name: "users", Alias: "u"}
 
