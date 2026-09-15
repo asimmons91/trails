@@ -77,6 +77,17 @@ func TestMergeSpurViewsNoMountsReturnsHostOnly(t *testing.T) {
 	require.Equal(t, "root", string(data))
 }
 
+func TestMergeSpurViewsSkipsSpurWithNilViewFS(t *testing.T) {
+	host := fstest.MapFS{"root/index.gohtml": &fstest.MapFile{Data: []byte("root")}}
+	spur := &fakeSpur{viewFS: nil}
+
+	merged := MergeSpurViews(host, Mount{Prefix: "/posts", Spur: spur})
+
+	data, err := fs.ReadFile(merged, "root/index.gohtml")
+	require.NoError(t, err)
+	require.Equal(t, "root", string(data))
+}
+
 func TestMergeSpurAssetsMergesHostAndSpurRoots(t *testing.T) {
 	host := fstest.MapFS{"application-abc123.js": &fstest.MapFile{Data: []byte("host")}}
 	spur := &fakeSpur{assetsFS: fstest.MapFS{"posts-def456.js": &fstest.MapFile{Data: []byte("posts")}}}

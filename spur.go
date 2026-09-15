@@ -9,6 +9,8 @@ import (
 )
 
 type Spur interface {
+	// ViewFS returns the sub-app's view templates, or nil if it has none to
+	// expose (e.g. an infrastructure-only spur with no templates).
 	ViewFS() fs.FS
 	AssetsFS() fs.FS
 	Routes(g *Group)
@@ -24,7 +26,9 @@ func MergeSpurViews(hostViews fs.FS, mounts ...Mount) fs.FS {
 	roots := make([]fs.FS, 0, len(mounts)+1)
 	roots = append(roots, hostViews)
 	for _, m := range mounts {
-		roots = append(roots, m.Spur.ViewFS())
+		if fsys := m.Spur.ViewFS(); fsys != nil {
+			roots = append(roots, fsys)
+		}
 	}
 
 	return MergeFS(roots...)

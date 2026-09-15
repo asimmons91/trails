@@ -36,6 +36,7 @@ func New(o *TrailOptions) (*Trail, error) {
 		logger:       o.Logger,
 		errorHandler: o.ErrorHandler,
 		routeBuilder: o.RouteBuilder,
+		binder:       o.Binder,
 		Host:         o.Host,
 		Port:         o.Port,
 	}
