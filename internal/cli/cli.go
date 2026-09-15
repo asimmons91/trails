@@ -6,7 +6,9 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-type CLI struct{}
+type CLI struct {
+	Migrate MigrateCmd `cmd:"" help:"Manage DB migrations."`
+}
 
 func Execute() {
 	var cli CLI
