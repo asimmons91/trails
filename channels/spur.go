@@ -63,11 +63,13 @@ func (b *Backend) Routes(g *trails.Group) {
 
 func (b *Backend) Jobs(r *jobs.Registry) {}
 
-// Run delegates to the Hub's Broadcaster's own Run loop, if it has one (e.g.
-// the database Broadcaster's polling loop) — satisfying trails.Runner so
-// this Spur can be picked up by RegisterSpurRunners. Broadcasters with
-// nothing to run (e.g. the memory Broadcaster) make this a harmless
-// immediate no-op.
+// Run delegates to the Hub's Broadcaster's own Run loop, if it implements
+// trails.Runner (both the database and memory Broadcasters do — the
+// database Broadcaster's is a real polling loop, the memory Broadcaster's
+// is a no-op that just waits for ctx to be cancelled) — satisfying
+// trails.Runner so this Spur can be picked up by RegisterSpurRunners. A
+// Broadcaster that doesn't implement it at all falls back to an immediate
+// no-op.
 func (b *Backend) Run(ctx context.Context) error {
 	r, ok := b.hub.Broadcaster().(trails.Runner)
 	if !ok {

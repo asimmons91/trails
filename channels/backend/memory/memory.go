@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	trails "github.com/asimmons91/trails"
 	"github.com/asimmons91/trails/channels"
 )
 
@@ -12,7 +13,10 @@ const defaultSubscriptionBuffer = 16
 
 var ErrClosed = errors.New("memory: broadcaster closed")
 
-var _ channels.Broadcaster = (*Backend)(nil)
+var (
+	_ channels.Broadcaster = (*Backend)(nil)
+	_ trails.Runner        = (*Backend)(nil)
+)
 
 type Backend struct {
 	mu     sync.Mutex
@@ -61,6 +65,14 @@ func (b *Backend) Subscribe(_ context.Context, topic string) (channels.Subscript
 	b.topics[topic][sub] = struct{}{}
 
 	return sub, nil
+}
+
+// Run is a no-op: memory.Backend delivers synchronously in Publish and has
+// nothing to poll. It exists so memory.Backend is interchangeable with
+// database.Backend wherever a trails.Runner is expected.
+func (b *Backend) Run(ctx context.Context) error {
+	<-ctx.Done()
+	return nil
 }
 
 func (b *Backend) Close() error {

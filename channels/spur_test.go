@@ -39,6 +39,20 @@ func (b *fakeRunnerBroadcaster) Run(ctx context.Context) error {
 	return nil
 }
 
+// fakePlainBroadcaster is a channels.Broadcaster with no Run method, used to
+// exercise Backend.Run's fallback for Broadcasters that don't implement
+// trails.Runner at all (both memory.Backend and database.Backend do, so
+// nothing shipped in this repo exercises this path anymore).
+type fakePlainBroadcaster struct{}
+
+func (b *fakePlainBroadcaster) Publish(ctx context.Context, topic string, payload []byte) error {
+	return nil
+}
+
+func (b *fakePlainBroadcaster) Subscribe(ctx context.Context, topic string) (channels.Subscription, error) {
+	return nil, nil
+}
+
 func TestViewFS_IsNil(t *testing.T) {
 	b := channels.New(newTestHub())
 
@@ -91,7 +105,7 @@ func TestRun_DelegatesToRunnableBroadcaster(t *testing.T) {
 }
 
 func TestRun_NoopsWhenBroadcasterHasNoRunMethod(t *testing.T) {
-	b := channels.New(newTestHub()) // memory.Backend has no Run method
+	b := channels.New(channels.NewHub(&fakePlainBroadcaster{}, channels.NewRegistry()))
 
 	done := make(chan error, 1)
 	go func() { done <- b.Run(context.Background()) }()
@@ -101,6 +115,31 @@ func TestRun_NoopsWhenBroadcasterHasNoRunMethod(t *testing.T) {
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		t.Fatal("Backend.Run should return immediately when the broadcaster has no Run method")
+	}
+}
+
+func TestRun_DelegatesToMemoryBackendRunUntilContextCancelled(t *testing.T) {
+	b := channels.New(newTestHub()) // memory.Backend now implements trails.Runner
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { result <- b.Run(ctx) }()
+
+	// memory.Backend.Run blocks on ctx.Done(); confirm Backend.Run doesn't
+	// return early on its own.
+	select {
+	case err := <-result:
+		t.Fatalf("Backend.Run returned before context cancellation: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	cancel()
+
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Backend.Run did not return after context cancellation")
 	}
 }
 
