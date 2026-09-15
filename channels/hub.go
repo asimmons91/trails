@@ -41,6 +41,10 @@ func NewHub(b Broadcaster, r *Registry) *Hub {
 	}
 }
 
+// Broadcaster returns the Hub's underlying Broadcaster, e.g. so a caller can
+// check whether it needs a background Run loop started (see channels.Backend.Run).
+func (h *Hub) Broadcaster() Broadcaster { return h.broadcaster }
+
 func (h *Hub) Connect() *Conn {
 	c := &Conn{
 		id:     newConnID(),

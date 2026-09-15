@@ -9,8 +9,6 @@ import (
 )
 
 type Spur interface {
-	// ViewFS returns the sub-app's view templates, or nil if it has none to
-	// expose (e.g. an infrastructure-only spur with no templates).
 	ViewFS() fs.FS
 	AssetsFS() fs.FS
 	Routes(g *Group)
@@ -77,4 +75,19 @@ func RegisterSpurJobs(reg *jobs.Registry, mounts ...Mount) {
 	for _, m := range mounts {
 		m.Spur.Jobs(reg)
 	}
+}
+
+// RegisterSpurRunners collects the background Runner for every mounted Spur
+// that has one (e.g. a channels.Backend wrapping a polling Broadcaster).
+// Spurs with nothing to run are silently skipped. Pass the result as
+// TrailOptions.Runners so Trail.Run starts and stops them alongside the HTTP
+// server.
+func RegisterSpurRunners(mounts ...Mount) []Runner {
+	var runners []Runner
+	for _, m := range mounts {
+		if r, ok := m.Spur.(Runner); ok {
+			runners = append(runners, r)
+		}
+	}
+	return runners
 }

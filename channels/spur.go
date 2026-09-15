@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"context"
 	"io/fs"
 	"log/slog"
 	"time"
@@ -61,3 +62,16 @@ func (b *Backend) Routes(g *trails.Group) {
 }
 
 func (b *Backend) Jobs(r *jobs.Registry) {}
+
+// Run delegates to the Hub's Broadcaster's own Run loop, if it has one (e.g.
+// the database Broadcaster's polling loop) — satisfying trails.Runner so
+// this Spur can be picked up by RegisterSpurRunners. Broadcasters with
+// nothing to run (e.g. the memory Broadcaster) make this a harmless
+// immediate no-op.
+func (b *Backend) Run(ctx context.Context) error {
+	r, ok := b.hub.Broadcaster().(trails.Runner)
+	if !ok {
+		return nil
+	}
+	return r.Run(ctx)
+}

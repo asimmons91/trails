@@ -9,7 +9,3 @@ type Backend interface {
 	Enqueue(ctx context.Context, e Enqueued) error
 	Close() error
 }
-
-type Runner interface {
-	Run(ctx context.Context) error
-}

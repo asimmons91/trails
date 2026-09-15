@@ -41,6 +41,17 @@ type noopJob struct{ kind string }
 func (j *noopJob) Kind() string                      { return j.kind }
 func (j *noopJob) Perform(ctx context.Context) error { return nil }
 
+// fakeRunnerSpur is a fakeSpur that also implements Runner, standing in
+// for a channels.Backend wrapping a polling Broadcaster.
+type fakeRunnerSpur struct {
+	fakeSpur
+}
+
+func (r *fakeRunnerSpur) Run(ctx context.Context) error {
+	<-ctx.Done()
+	return nil
+}
+
 func TestMergeSpurViewsMergesHostAndSpurRoots(t *testing.T) {
 	host := fstest.MapFS{"root/index.gohtml": &fstest.MapFile{Data: []byte("root")}}
 	spur := &fakeSpur{viewFS: fstest.MapFS{"posts/index.gohtml": &fstest.MapFile{Data: []byte("posts")}}}
@@ -213,6 +224,25 @@ func TestRegisterSpurJobsRegistersMultipleSpursIndependently(t *testing.T) {
 
 	require.NoError(t, reg.Dispatch(context.Background(), jobs.Enqueued{Kind: "posts.notify"}))
 	require.NoError(t, reg.Dispatch(context.Background(), jobs.Enqueued{Kind: "comments.notify"}))
+}
+
+func TestRegisterSpurRunnersCollectsOnlySpursWithRunMethod(t *testing.T) {
+	plain := &fakeSpur{}
+	runner := &fakeRunnerSpur{}
+
+	runners := RegisterSpurRunners(
+		Mount{Prefix: "/posts", Spur: plain},
+		Mount{Prefix: "/cable", Spur: runner},
+	)
+
+	require.Len(t, runners, 1)
+	require.Same(t, runner, runners[0])
+}
+
+func TestRegisterSpurRunnersReturnsEmptyWhenNoSpurHasRunMethod(t *testing.T) {
+	runners := RegisterSpurRunners(Mount{Prefix: "/posts", Spur: &fakeSpur{}})
+
+	require.Empty(t, runners)
 }
 
 func TestRegisterSpurRoutesMountsMultipleSpursIndependently(t *testing.T) {

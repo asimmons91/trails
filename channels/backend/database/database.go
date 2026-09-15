@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/asimmons91/trails"
 	"github.com/asimmons91/trails/channels"
 	"github.com/asimmons91/trails/pack"
 )
@@ -23,7 +24,10 @@ const (
 
 var ErrClosed = errors.New("database: broadcaster closed")
 
-var _ channels.Broadcaster = (*Backend)(nil)
+var (
+	_ channels.Broadcaster = (*Backend)(nil)
+	_ trails.Runner        = (*Backend)(nil)
+)
 
 type Option func(*Backend)
 

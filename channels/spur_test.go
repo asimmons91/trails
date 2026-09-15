@@ -18,6 +18,27 @@ func newTestHub() *channels.Hub {
 	return channels.NewHub(memory.New(), channels.NewRegistry())
 }
 
+// fakeRunnerBroadcaster is a channels.Broadcaster that also implements
+// trails.Runner, standing in for database.Backend without pulling in a real
+// database driver.
+type fakeRunnerBroadcaster struct {
+	started chan struct{}
+}
+
+func (b *fakeRunnerBroadcaster) Publish(ctx context.Context, topic string, payload []byte) error {
+	return nil
+}
+
+func (b *fakeRunnerBroadcaster) Subscribe(ctx context.Context, topic string) (channels.Subscription, error) {
+	return nil, nil
+}
+
+func (b *fakeRunnerBroadcaster) Run(ctx context.Context) error {
+	close(b.started)
+	<-ctx.Done()
+	return nil
+}
+
 func TestViewFS_IsNil(t *testing.T) {
 	b := channels.New(newTestHub())
 
@@ -43,6 +64,44 @@ func TestNewPanicsOnNilHub(t *testing.T) {
 	require.Panics(t, func() {
 		channels.New(nil)
 	})
+}
+
+func TestRun_DelegatesToRunnableBroadcaster(t *testing.T) {
+	bc := &fakeRunnerBroadcaster{started: make(chan struct{})}
+	b := channels.New(channels.NewHub(bc, channels.NewRegistry()))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { result <- b.Run(ctx) }()
+
+	select {
+	case <-bc.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("broadcaster Run was not started")
+	}
+
+	cancel()
+
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Backend.Run did not return after context cancellation")
+	}
+}
+
+func TestRun_NoopsWhenBroadcasterHasNoRunMethod(t *testing.T) {
+	b := channels.New(newTestHub()) // memory.Backend has no Run method
+
+	done := make(chan error, 1)
+	go func() { done <- b.Run(context.Background()) }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Backend.Run should return immediately when the broadcaster has no Run method")
+	}
 }
 
 func TestRoutes_RegistersStreamAndCommandPaths(t *testing.T) {

@@ -28,6 +28,10 @@ type TrailOptions struct {
 	Host           string
 	Port           int
 	AssetsStrategy AssetsStrategy
+	// Runners are started as background goroutines alongside the HTTP
+	// server by Trail.Run, and stopped on the same shutdown signal —
+	// typically built via RegisterSpurRunners(mounts...).
+	Runners []Runner
 }
 
 func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
@@ -44,6 +48,7 @@ func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
 		Host:           opts.Host,
 		Port:           opts.Port,
 		AssetsStrategy: opts.AssetsStrategy,
+		Runners:        opts.Runners,
 	}
 
 	if o.Context == nil {
