@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="Preview the full next release (version, tags, changelog) without making any changes"
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+source "${ROOT}/.mise/lib/release-common.sh"
+
+next=$(compute_next_version)
+
+echo "=== DRY RUN - nothing will be created or pushed ==="
+echo "Next version: ${next}"
+echo
+echo "Tags that would be created:"
+echo "  ${next}"
+for m in "${SUBMODULES[@]}"; do
+  echo "  ${m}/${next}"
+done
+echo
+echo "--- Release notes preview ---"
+render_notes "$next"

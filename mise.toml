@@ -1,6 +1,7 @@
 [tools]
 go = "1.27.1"
 golangci-lint = "latest"
+git-cliff = "latest"
 
 [tasks.check]
 description = "Run all checks for project"

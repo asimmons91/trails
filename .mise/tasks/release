@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+#MISE description="Cut a lockstep release: tag all modules, push, and create a GitHub Release"
+#MISE depends=["check"]
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+source "${ROOT}/.mise/lib/release-common.sh"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ERROR: working tree is not clean. Commit or stash changes before releasing." >&2
+  exit 1
+fi
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$branch" != "main" ]; then
+  echo "WARN: releasing from branch '${branch}', not 'main'." >&2
+fi
+
+current=$(latest_root_tag)
+next=$(compute_next_version)
+
+if [ "$next" == "$current" ]; then
+  echo "ERROR: no releasable changes since ${current}. Nothing to do." >&2
+  exit 1
+fi
+
+echo "Releasing ${current:-<none>} -> ${next}"
+
+notes_file=$(mktemp)
+trap 'rm -f "$notes_file"' EXIT
+render_notes "$next" > "$notes_file"
+
+echo "Creating tags..."
+git tag -a "$next" -m "Release ${next}"
+for m in "${SUBMODULES[@]}"; do
+  git tag -a "${m}/${next}" -m "Release ${m} ${next}"
+done
+
+echo "Pushing tags..."
+git push origin "$next"
+for m in "${SUBMODULES[@]}"; do
+  git push origin "${m}/${next}"
+done
+
+echo "Creating GitHub Release..."
+gh release create "$next" \
+  --title "$next" \
+  --notes-file "$notes_file"
+
+echo "Done. Released ${next}."
