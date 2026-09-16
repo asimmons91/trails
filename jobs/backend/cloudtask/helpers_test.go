@@ -17,7 +17,7 @@ import (
 	trails "github.com/asimmons91/trails"
 	"github.com/asimmons91/trails/jobs/backend/cloudtask"
 	"github.com/asimmons91/trails/pack"
-	"github.com/asimmons91/trails/pack/drivers/sqlite"
+	"github.com/asimmons91/trails/pack/driver/sqlite"
 	"github.com/asimmons91/trails/pack/migrate"
 )
 

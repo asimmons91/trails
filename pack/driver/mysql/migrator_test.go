@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/asimmons91/trails/driver/mysql"
 	"github.com/asimmons91/trails/pack"
+	"github.com/asimmons91/trails/pack/driver/mysql"
 	"github.com/asimmons91/trails/pack/migrate"
 	"github.com/testcontainers/testcontainers-go"
 	tcmysql "github.com/testcontainers/testcontainers-go/modules/mysql"

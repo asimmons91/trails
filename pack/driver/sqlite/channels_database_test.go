@@ -8,7 +8,7 @@ import (
 	"github.com/asimmons91/trails/channels"
 	"github.com/asimmons91/trails/channels/backend/database"
 	"github.com/asimmons91/trails/pack"
-	"github.com/asimmons91/trails/pack/drivers/sqlite"
+	"github.com/asimmons91/trails/pack/driver/sqlite"
 	"github.com/asimmons91/trails/pack/migrate"
 	"github.com/stretchr/testify/require"
 )

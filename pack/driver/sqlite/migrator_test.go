@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/asimmons91/trails/pack"
-	"github.com/asimmons91/trails/pack/drivers/sqlite"
+	"github.com/asimmons91/trails/pack/driver/sqlite"
 	"github.com/asimmons91/trails/pack/migrate"
 )
 
