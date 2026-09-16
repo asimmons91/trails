@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	trails "github.com/asimmons91/trails"
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/pack"
 )
@@ -66,8 +67,8 @@ func WithBackoff(base, max time.Duration) Option {
 }
 
 var (
-	_ jobs.Backend = (*Backend)(nil)
-	_ jobs.Runner  = (*Backend)(nil)
+	_ jobs.Backend  = (*Backend)(nil)
+	_ trails.Runner = (*Backend)(nil)
 )
 
 type Backend struct {

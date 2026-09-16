@@ -3,6 +3,7 @@ package trails
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -167,6 +168,80 @@ func TestServeHTTPDelegatesToRouter(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "hello", w.Body.String())
+}
+
+// fakeRunner is a Runner used to exercise TrailOptions.Runners. If
+// failFast is set, Run returns runErr immediately instead of blocking on
+// ctx.Done() first.
+type fakeRunner struct {
+	started  chan struct{}
+	runErr   error
+	failFast bool
+}
+
+func (r *fakeRunner) Run(ctx context.Context) error {
+	if r.started != nil {
+		close(r.started)
+	}
+	if r.failFast {
+		return r.runErr
+	}
+	<-ctx.Done()
+	return r.runErr
+}
+
+func TestRunStartsAndStopsRunners(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := &fakeRunner{started: make(chan struct{})}
+	trail := newTestTrail(t, &TrailOptions{
+		Host:    "127.0.0.1",
+		Port:    0,
+		Context: ctx,
+		Runners: []Runner{runner},
+	})
+
+	result := make(chan error, 1)
+	go func() {
+		result <- trail.Run()
+	}()
+
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runner was not started")
+	}
+
+	cancel()
+
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after context cancellation")
+	}
+}
+
+func TestRunReturnsRunnerErrorAndShutsDownServer(t *testing.T) {
+	runner := &fakeRunner{started: make(chan struct{}), runErr: errors.New("boom"), failFast: true}
+	trail := newTestTrail(t, &TrailOptions{
+		Host:    "127.0.0.1",
+		Port:    0,
+		Runners: []Runner{runner},
+	})
+
+	result := make(chan error, 1)
+	go func() {
+		result <- trail.Run()
+	}()
+
+	select {
+	case err := <-result:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "runner error")
+		require.Contains(t, err.Error(), "boom")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after runner error")
+	}
 }
 
 func TestRunReturnsServerErrorWhenAddressInUse(t *testing.T) {
