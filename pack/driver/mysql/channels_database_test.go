@@ -39,6 +39,7 @@ func newChannelsDatabaseTestDB(t *testing.T) *pack.DB {
 }
 
 func TestDatabaseChannels_CrossInstanceDelivery(t *testing.T) {
+	t.Parallel()
 	db := newChannelsDatabaseTestDB(t)
 	ctx := context.Background()
 
@@ -81,6 +82,7 @@ func requireDatabaseTestReceives(t *testing.T, sub channels.Subscription, want s
 }
 
 func TestDatabaseChannels_TrimSweepsRowsPastRetention(t *testing.T) {
+	t.Parallel()
 	db := newChannelsDatabaseTestDB(t)
 	ctx := context.Background()
 

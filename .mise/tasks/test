@@ -2,8 +2,15 @@
 #MISE description="Test Workspace"
 
 set -e
-go test ./... -race
+go test ./... -race -parallel 6
 mapfile -t submodules < <(find . -mindepth 2 -name go.mod | xargs -n1 dirname | sed 's|^\./||' | sort)
+pids=()
 for d in "${submodules[@]}"; do
-  (cd "$d" && go test ./... -race)
+  (cd "$d" && go test ./... -race -parallel 6) &
+  pids+=($!)
 done
+status=0
+for pid in "${pids[@]}"; do
+  wait "$pid" || status=1
+done
+exit $status

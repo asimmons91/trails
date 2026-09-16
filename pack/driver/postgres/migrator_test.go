@@ -45,6 +45,7 @@ type pgOrder struct {
 // lifecycle, introspection, and that the FK constraint it creates is
 // actually enforced by the database, not just recorded as SQL text.
 func TestMigrator_Postgres_FullRoundTrip(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	pgc, err := tcpostgres.Run(ctx,
