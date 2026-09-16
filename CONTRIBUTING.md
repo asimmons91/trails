@@ -31,7 +31,18 @@ submodules) are released together under one lockstep version.
 
 - `mise run version-next` — preview the next version and the commits behind it.
 - `mise run release-dry-run` — preview the full release (tags + notes), no side effects.
-- `mise run release` — cut the release: tags all modules, pushes, and creates a GitHub Release.
+- `mise run release` — cut the release: rewrites each submodule's
+  `github.com/asimmons91/trails*` `go.mod` require lines to the released
+  version (and commits that change), tags all modules, pushes, and creates
+  a GitHub Release.
+
+Submodules pin `github.com/asimmons91/trails` (and cross-submodule deps,
+e.g. `cloudtask` -> `pack/driver/sqlite`) via a local `replace` directive
+for in-repo development, but `replace` directives are ignored when a module
+is consumed as a dependency from outside this repo. `mise run release`
+rewrites the corresponding `require` lines to the real released version
+before tagging, so external consumers resolve a real `trails` version
+instead of the local placeholder.
 
 The same tasks run identically locally or via the `Release` GitHub Actions
 workflow (`workflow_dispatch`, with a `dry_run` input).
