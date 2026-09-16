@@ -19,6 +19,10 @@ run = "go test ./..."
 [tasks.check]
 description = "Run all checks locally"
 depends = ["fmt", "vet", "lint", "test"]
+
+[tasks.generate]
+description = "Regenerate pack ORM field/relation helpers"
+run = "trails generate fields"
 {{if eq .AssetsStrategy "bundler"}}
 [tasks.deps]
 description = "Install deps"

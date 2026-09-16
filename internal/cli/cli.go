@@ -9,6 +9,7 @@ import (
 type CLI struct {
 	Version     kong.VersionFlag `help:"Print version and exit."`
 	New         NewCmd           `cmd:"" help:"Generate a new trails application."`
+	Generate    GenerateCmd      `cmd:"" help:"Code generation tools."`
 	Migrate     MigrateCmd       `cmd:"" help:"Manage DB migrations."`
 	Assets      AssetsCmd        `cmd:"" help:"Build frontend assets."`
 	Importmap   ImportmapCmd     `cmd:"" help:"Manage the JS importmap."`

@@ -23,6 +23,11 @@ This app uses trails' `pack` ORM with {{if eq .Database "sqlite"}}SQLite{{else i
 
 A starter migration and example model (`app/models/example.go`) are already
 included — run `trails migrate up` before starting the app for the first time.
+
+Type-safe field/relation query helpers (`ExampleFields.Title.Eq("x")`, etc.)
+can be generated from your models instead of hand-written:
+
+    trails generate fields    # (re)generate app/models/trails_fields_gen.go with type-safe *Fields helpers
 {{if ne .Database "sqlite"}}
 This app expects a {{if eq .Database "postgres"}}Postgres{{else}}MySQL{{end}} server reachable with the
 credentials in `config/application.toml` (override per-environment in
