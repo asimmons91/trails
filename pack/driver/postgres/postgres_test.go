@@ -13,6 +13,7 @@ import (
 )
 
 func TestOpen(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	pgc, err := tcpostgres.Run(ctx,
@@ -60,6 +61,7 @@ func TestDialect(t *testing.T) {
 }
 
 func TestDialect_ClassifiesDuplicateKeyError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	pgc, err := tcpostgres.Run(ctx,
@@ -119,6 +121,7 @@ type widget struct {
 func (widget) TableName() string { return "widgets" }
 
 func TestConnect_ClassifiesDuplicateKeyError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	pgc, err := tcpostgres.Run(ctx,

@@ -64,6 +64,7 @@ func (j *markerJob) Perform(context.Context) error {
 // the property SQLite's single-writer test can't prove, since SQLite never
 // has two real concurrent claimers.
 func TestDBQueue_SkipLockedClaimIsExclusiveAcrossConcurrentWorkers(t *testing.T) {
+	t.Parallel()
 	db := newDBQueueTestDB(t)
 
 	const numJobs = 40

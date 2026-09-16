@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#MISE description="Print the next lockstep release version and the commits driving it (read-only)"
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+source "${ROOT}/.mise/lib/release-common.sh"
+
+current=$(latest_root_tag)
+next=$(compute_next_version)
+
+echo "Current version: ${current:-<none>}"
+echo "Next version:    ${next}"
+echo
+echo "Commits since ${current:-repo start}:"
+if [ -n "$current" ]; then
+  git log --pretty='  - %h %s' "${current}..HEAD"
+else
+  git log --pretty='  - %h %s'
+fi

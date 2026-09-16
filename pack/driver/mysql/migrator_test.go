@@ -46,6 +46,7 @@ type myOrder struct {
 // introspection, and that the FK constraint it creates is actually enforced
 // by the database, not just recorded as SQL text.
 func TestMigrator_MySQL_FullRoundTrip(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mc, err := tcmysql.Run(ctx,
