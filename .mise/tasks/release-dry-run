@@ -16,5 +16,13 @@ for m in "${SUBMODULES[@]}"; do
   echo "  ${m}/${next}"
 done
 echo
+
+echo "go.mod requires that would be bumped to ${next}:"
+for m in "${SUBMODULES[@]}"; do
+  for dep in $(trails_requires_in "$m"); do
+    echo "  ${m}/go.mod: ${dep} -> ${next}"
+  done
+done
+echo
 echo "--- Release notes preview ---"
 render_notes "$next"

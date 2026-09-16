@@ -22,6 +22,25 @@ compute_next_version() {
   git cliff --bumped-version 2>/dev/null
 }
 
+# Lines matching this are require-block entries (module path is the first
+# token on the line), not the `module` declaration or `replace` directives.
+trails_requires_in() {
+  grep -E '^\s*github\.com/asimmons91/trails(/|\s)' "$1/go.mod" | awk '{print $1}' | sort -u
+}
+
+# Rewrites every github.com/asimmons91/trails* require line across all
+# submodules to next_version. Pure text/AST edit via `go mod edit` - no
+# network access, and local `replace` directives keep builds working
+# regardless of what the require version string says.
+bump_requires() {
+  local next_version="$1" m dep
+  for m in "${SUBMODULES[@]}"; do
+    for dep in $(trails_requires_in "$m"); do
+      (cd "$m" && go mod edit -require="${dep}@${next_version}")
+    done
+  done
+}
+
 render_notes() {
   local next_version="$1"
   local current

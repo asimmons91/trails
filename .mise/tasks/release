@@ -30,6 +30,14 @@ notes_file=$(mktemp)
 trap 'rm -f "$notes_file"' EXIT
 render_notes "$next" > "$notes_file"
 
+echo "Bumping go.mod requires to ${next}..."
+bump_requires "$next"
+if [ -n "$(git status --porcelain)" ]; then
+  git add -- '**/go.mod'
+  git commit -m "chore(release): bump go.mod requires to ${next}"
+  git push origin "$branch"
+fi
+
 echo "Creating tags..."
 git tag -a "$next" -m "Release ${next}"
 for m in "${SUBMODULES[@]}"; do
