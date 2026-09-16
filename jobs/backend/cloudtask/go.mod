@@ -5,7 +5,7 @@ go 1.27
 require (
 	cloud.google.com/go/cloudtasks v1.19.0
 	github.com/asimmons91/trails v0.0.0
-	github.com/asimmons91/trails/pack/drivers/sqlite v0.0.0-00010101000000-000000000000
+	github.com/asimmons91/trails/pack/driver/sqlite v0.0.0-00010101000000-000000000000
 	github.com/googleapis/gax-go/v2 v2.24.1
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/api v0.298.0
@@ -55,4 +55,4 @@ require (
 
 replace github.com/asimmons91/trails => ../../..
 
-replace github.com/asimmons91/trails/pack/drivers/sqlite => ../../../pack/driver/sqlite
+replace github.com/asimmons91/trails/pack/driver/sqlite => ../../../pack/driver/sqlite

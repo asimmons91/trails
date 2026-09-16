@@ -10,7 +10,7 @@ import (
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/jobs/backend/dbqueue"
 	"github.com/asimmons91/trails/pack"
-	"github.com/asimmons91/trails/pack/drivers/sqlite"
+	"github.com/asimmons91/trails/pack/driver/sqlite"
 	"github.com/asimmons91/trails/pack/migrate"
 	"github.com/stretchr/testify/require"
 )

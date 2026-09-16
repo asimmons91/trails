@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/asimmons91/trails/driver/postgres"
 	"github.com/asimmons91/trails/pack"
+	"github.com/asimmons91/trails/pack/driver/postgres"
 	"github.com/asimmons91/trails/pack/migrate"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"

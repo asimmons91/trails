@@ -8,7 +8,7 @@ import (
 
 	"github.com/asimmons91/trails/pack"
 	"github.com/asimmons91/trails/pack/driver"
-	"github.com/asimmons91/trails/pack/drivers/sqlite"
+	"github.com/asimmons91/trails/pack/driver/sqlite"
 )
 
 func TestOpen(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 
 	"github.com/asimmons91/trails/channels"
 	"github.com/asimmons91/trails/channels/backend/database"
-	"github.com/asimmons91/trails/driver/postgres"
 	"github.com/asimmons91/trails/pack"
+	"github.com/asimmons91/trails/pack/driver/postgres"
 	"github.com/asimmons91/trails/pack/migrate"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
