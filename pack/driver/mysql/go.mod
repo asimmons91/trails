@@ -3,7 +3,7 @@ module github.com/asimmons91/trails/pack/driver/mysql
 go 1.27
 
 require (
-	github.com/asimmons91/trails v0.0.0
+	github.com/asimmons91/trails v0.1.1
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0

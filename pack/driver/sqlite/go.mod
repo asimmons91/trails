@@ -3,7 +3,7 @@ module github.com/asimmons91/trails/pack/driver/sqlite
 go 1.27
 
 require (
-	github.com/asimmons91/trails v0.0.0
+	github.com/asimmons91/trails v0.1.1
 	github.com/stretchr/testify v1.12.1
 	modernc.org/sqlite v1.58.0
 )
