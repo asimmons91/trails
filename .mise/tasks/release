@@ -44,6 +44,13 @@ for m in "${SUBMODULES[@]}"; do
   git tag -a "${m}/${next}" -m "Release ${m} ${next}"
 done
 
+# GORELEASER_CURRENT_TAG pins the version explicitly: HEAD carries both the
+# root tag and every submodule's path-prefixed tag (e.g.
+# jobs/backend/cloudtask/v0.1.1), so `git describe`'s own tag resolution
+# is ambiguous and can pick a submodule tag instead of the root release tag.
+echo "Building release binaries..."
+GORELEASER_CURRENT_TAG="$next" goreleaser release --clean --skip=publish --skip=announce
+
 echo "Pushing tags..."
 git push origin "$next"
 for m in "${SUBMODULES[@]}"; do
@@ -53,6 +60,7 @@ done
 echo "Creating GitHub Release..."
 gh release create "$next" \
   --title "$next" \
-  --notes-file "$notes_file"
+  --notes-file "$notes_file" \
+  dist/*.tar.gz dist/*.zip dist/checksums.txt
 
 echo "Done. Released ${next}."

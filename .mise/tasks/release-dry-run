@@ -26,3 +26,6 @@ done
 echo
 echo "--- Release notes preview ---"
 render_notes "$next"
+echo
+echo "--- Release binaries preview (snapshot build, dist/ not published) ---"
+goreleaser release --clean --skip=publish --skip=announce --snapshot

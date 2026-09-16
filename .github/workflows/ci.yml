@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: mise run lint
 
+      - name: Build Check
+        run: mise run build-check
+
       - name: Cache testcontainer images
         uses: ScribeMD/docker-cache@0.5.0
         with:

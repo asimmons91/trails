@@ -7,18 +7,20 @@ import (
 )
 
 type CLI struct {
-	New         NewCmd         `cmd:"" help:"Generate a new trails application."`
-	Migrate     MigrateCmd     `cmd:"" help:"Manage DB migrations."`
-	Assets      AssetsCmd      `cmd:"" help:"Build frontend assets."`
-	Importmap   ImportmapCmd   `cmd:"" help:"Manage the JS importmap."`
-	Credentials CredentialsCmd `cmd:"" help:"Manage encrypted credentials."`
+	Version     kong.VersionFlag `help:"Print version and exit."`
+	New         NewCmd           `cmd:"" help:"Generate a new trails application."`
+	Migrate     MigrateCmd       `cmd:"" help:"Manage DB migrations."`
+	Assets      AssetsCmd        `cmd:"" help:"Build frontend assets."`
+	Importmap   ImportmapCmd     `cmd:"" help:"Manage the JS importmap."`
+	Credentials CredentialsCmd   `cmd:"" help:"Manage encrypted credentials."`
 }
 
-func Execute() {
+func Execute(version string) {
 	var cli CLI
 	k, err := kong.New(&cli,
 		kong.Name("trails"),
-		kong.Description("Trails CLI: a fast framework with opinions"))
+		kong.Description("Trails CLI: a fast framework with opinions"),
+		kong.Vars{"version": version})
 	if err != nil {
 		panic(err)
 	}
