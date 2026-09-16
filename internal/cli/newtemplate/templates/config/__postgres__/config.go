@@ -3,6 +3,7 @@ package config
 import "embed"
 
 //go:embed application.toml
+//go:embed credentials
 //go:embed environments
 //go:embed importmap.toml
 var ConfigFS embed.FS

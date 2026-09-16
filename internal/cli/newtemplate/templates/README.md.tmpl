@@ -32,6 +32,26 @@ development:
 {{if eq .Database "postgres"}}    docker run -d -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=app_development postgres:16-alpine
 {{else}}    docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=app_development mysql:8
 {{end}}{{end}}
+## Credentials
+
+This app has encrypted credentials for the `development` environment already:
+`config/credentials/development.toml.enc` (safe to commit) plus
+`config/credentials/development.key` (gitignored — the master key, distribute
+it out-of-band). Manage them with:
+
+    trails credentials edit --environment=development   # decrypt, open $EDITOR, re-encrypt
+    trails credentials show --environment=development    # print decrypted contents
+
+Other environments (`production`, `test`, ...) get their own key + encrypted
+file the first time you run `trails credentials edit -e <environment>`. In
+deploys without a key file on disk, set `TRAILS_MASTER_KEY` instead.
+
+Any TOML entry whose shape matches `Config` (e.g. `[database]\npassword =
+"..."`) is layered onto the loaded config automatically — a good place to
+move secrets like the database password out of plaintext
+`config/environments/*.toml`. Anything else goes through
+`trails.LoadCredentials[config.Credentials]`.
+
 ## Assets
 {{if eq .AssetsStrategy "bundler"}}
 This app builds its frontend with esbuild (JS) and Tailwind CLI (CSS) from

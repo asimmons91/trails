@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/asimmons91/trails/internal/credentials"
 )
 
 func Environment() string {
@@ -37,6 +39,10 @@ func LoadConfig[T any](environment string, configFS fs.FS) (*T, error) {
 		return nil, fmt.Errorf("loading config/%s: %w", envConfig, err)
 	}
 
+	if err := decodeCredentials(environment, configFS, &cfg); err != nil {
+		return nil, fmt.Errorf("loading credentials for %q: %w", environment, err)
+	}
+
 	if err := applyEnvOverrides(&cfg); err != nil {
 		return nil, fmt.Errorf("loading TRAILS_* env overrides: %w", err)
 	}
@@ -51,6 +57,18 @@ func decodeTOML(configFS fs.FS, name string, v any) error {
 	}
 
 	return toml.NewDecoder(bytes.NewReader(data)).Decode(v)
+}
+
+func decodeCredentials(environment string, configFS fs.FS, cfg any) error {
+	plaintext, ok, err := credentials.ReadDecrypted(configFS, environment)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	return toml.Unmarshal(plaintext, cfg)
 }
 
 func applyEnvOverrides(cfg any) error {

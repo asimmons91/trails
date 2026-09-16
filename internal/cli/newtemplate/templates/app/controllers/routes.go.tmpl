@@ -12,10 +12,8 @@ func Routes(db *pack.DB, assetsFS, staticFS fs.FS) trails.RouteBuilder {
 		r.Static("/assets/", assetsFS)
 		r.Static("/static/", staticFS)
 
-		root := &RootController{}
 		examples := NewExamplesController(db)
 
-		r.Get("/{$}", root.Index)
 		r.Get("/examples", examples.Index)
 		r.Post("/examples", examples.Create)
 	}

@@ -7,10 +7,11 @@ import (
 )
 
 type CLI struct {
-	New       NewCmd       `cmd:"" help:"Generate a new trails application."`
-	Migrate   MigrateCmd   `cmd:"" help:"Manage DB migrations."`
-	Assets    AssetsCmd    `cmd:"" help:"Build frontend assets."`
-	Importmap ImportmapCmd `cmd:"" help:"Manage the JS importmap."`
+	New         NewCmd         `cmd:"" help:"Generate a new trails application."`
+	Migrate     MigrateCmd     `cmd:"" help:"Manage DB migrations."`
+	Assets      AssetsCmd      `cmd:"" help:"Build frontend assets."`
+	Importmap   ImportmapCmd   `cmd:"" help:"Manage the JS importmap."`
+	Credentials CredentialsCmd `cmd:"" help:"Manage encrypted credentials."`
 }
 
 func Execute() {

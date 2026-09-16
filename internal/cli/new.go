@@ -15,6 +15,7 @@ import (
 
 	"github.com/asimmons91/trails/assets"
 	"github.com/asimmons91/trails/internal/cli/newtemplate"
+	"github.com/asimmons91/trails/internal/credentials"
 )
 
 const newTemplatesRoot = "templates"
@@ -77,6 +78,11 @@ func (c *NewCmd) Run() error {
 		return fmt.Errorf("new: generating %s: %w", target, err)
 	}
 	logger.Info("generated app", "path", target, "database", data.Database, "assets", data.AssetsStrategy)
+
+	if err := writeNewCredentials(target); err != nil {
+		_ = os.RemoveAll(target)
+		return fmt.Errorf("new: generating credentials: %w", err)
+	}
 
 	if out, err := runIn(target, "gofmt", "-w", "."); err != nil {
 		logger.Warn("new: `gofmt` failed, run it manually inside the app directory", "error", err, "output", out)
@@ -200,6 +206,42 @@ func writeNewTemplateTree(target string, data newTemplateData) error {
 
 		return os.WriteFile(destPath, content, perm)
 	})
+}
+
+// newDefaultCredentialsEnv is the only environment given a master key +
+// encrypted credentials file at `trails new` time; others are created
+// lazily via `trails credentials edit --environment=<env>`.
+const newDefaultCredentialsEnv = "development"
+
+// writeNewCredentials seeds the new app's development credentials: a random
+// master key (gitignored) and an encrypted, empty starter file (safe to
+// commit) so the workflow documented in the generated README works
+// immediately.
+func writeNewCredentials(target string) error {
+	key, err := credentials.GenerateKey()
+	if err != nil {
+		return err
+	}
+
+	encoded, err := credentials.Encrypt(key, credentials.DefaultContents())
+	if err != nil {
+		return err
+	}
+
+	keyPath := filepath.Join(target, credentials.KeyPath(newDefaultCredentialsEnv))
+	encPath := filepath.Join(target, credentials.EncPath(newDefaultCredentialsEnv))
+
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0o755); err != nil {
+		return fmt.Errorf("creating %s: %w", filepath.Dir(keyPath), err)
+	}
+	if err := os.WriteFile(keyPath, []byte(key+"\n"), 0o600); err != nil {
+		return fmt.Errorf("writing %s: %w", keyPath, err)
+	}
+	if err := os.WriteFile(encPath, []byte(encoded), 0o644); err != nil {
+		return fmt.Errorf("writing %s: %w", encPath, err)
+	}
+
+	return nil
 }
 
 func runIn(dir, name string, args ...string) (string, error) {
