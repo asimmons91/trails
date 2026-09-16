@@ -1,0 +1,15 @@
+{{ define "application" }}
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="stylesheet" href="{{ asset_path "app.css" }}" />
+      {{ import_maps }}
+      <title>Trails App</title>
+    </head>
+    <body>
+      {{ template "content" . }}
+    </body>
+  </html>
+{{ end }}

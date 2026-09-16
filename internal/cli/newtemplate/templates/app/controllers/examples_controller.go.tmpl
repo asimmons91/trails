@@ -1,0 +1,43 @@
+package controllers
+
+import (
+	"net/http"
+
+	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/pack"
+
+	"{{.ModulePath}}/app/models"
+)
+
+type ExamplesController struct {
+	db *pack.DB
+}
+
+func NewExamplesController(db *pack.DB) *ExamplesController {
+	return &ExamplesController{db: db}
+}
+
+func (e *ExamplesController) Index(c *trails.Context) error {
+	examples, err := pack.Of[models.Example](e.db).Find(c.Context())
+	if err != nil {
+		return err
+	}
+
+	return c.Render(http.StatusOK, "examples/index", examples)
+}
+
+func (e *ExamplesController) Create(c *trails.Context) error {
+	var in struct {
+		Title string `form:"title"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return err
+	}
+
+	if err := pack.Create(c.Context(), e.db, &models.Example{Title: in.Title}); err != nil {
+		return err
+	}
+
+	http.Redirect(c.Response(), c.Request(), "/examples", http.StatusSeeOther)
+	return nil
+}

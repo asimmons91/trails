@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 )
@@ -337,6 +338,35 @@ func TestServeHTTPWithoutOverrideDispatchesNormally(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "get-handler", w.Body.String())
+}
+
+func TestRouterStaticServesFiles(t *testing.T) {
+	fsys := fstest.MapFS{
+		"app.css": &fstest.MapFile{Data: []byte("body {}")},
+	}
+
+	rt := newTestRouter()
+	rt.Static("/assets/", fsys)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/assets/app.css", nil)
+	rt.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "body {}", w.Body.String())
+}
+
+func TestRouterStaticMissingFileReturnsNotFound(t *testing.T) {
+	fsys := fstest.MapFS{}
+
+	rt := newTestRouter()
+	rt.Static("/assets/", fsys)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/assets/missing.css", nil)
+	rt.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestNewGroup(t *testing.T) {

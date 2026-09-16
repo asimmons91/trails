@@ -1,0 +1,47 @@
+[tools]
+air = "latest"
+go = "{{.GoVersion}}"
+golangci-lint = "latest"
+{{if eq .AssetsStrategy "bundler"}}node = "latest"
+{{end}}
+[tasks.vet]
+description = "Vet Code"
+run = "go vet ./..."
+
+[tasks.lint]
+description = "Lint Code"
+run = "golangci-lint run ./..."
+
+[tasks.test]
+description = "Test Code"
+run = "go test ./..."
+
+[tasks.check]
+description = "Run all checks locally"
+depends = ["fmt", "vet", "lint", "test"]
+{{if eq .AssetsStrategy "bundler"}}
+[tasks.deps]
+description = "Install deps"
+run = "npm install"
+
+[tasks.assets]
+depends = ["deps"]
+description = "Process assets"
+run = "trails assets build --scripts=build:js,build:css"
+{{end}}
+[tasks.build]
+description = "Build Project"
+{{if eq .AssetsStrategy "bundler"}}depends = ["assets"]
+{{end}}run = "go build -o bin/{{.AppName}} ./cmd/{{.AppName}}"
+
+[tasks.build_debug]
+description = "Debug Build Project"
+{{if eq .AssetsStrategy "bundler"}}depends = ["assets"]
+{{end}}run = "go build -o bin/{{.AppName}} -gcflags='all=-N -l' ./cmd/{{.AppName}}"
+
+[tasks.dev]
+description = "Run Dev With Reload"
+run = "air"
+
+[settings]
+jobs = 1

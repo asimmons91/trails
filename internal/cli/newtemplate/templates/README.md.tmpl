@@ -1,0 +1,79 @@
+# {{.AppName}}
+
+A [trails](https://github.com/asimmons91/trails) application.
+
+## Getting started
+
+    mise install
+{{if eq .AssetsStrategy "bundler"}}    mise run deps
+{{end}}    trails migrate up
+    mise run dev
+
+This starts the app with live reload (via [air](https://github.com/air-verse/air))
+at http://127.0.0.1:3000.
+
+## Database
+
+This app uses trails' `pack` ORM with {{if eq .Database "sqlite"}}SQLite{{else if eq .Database "postgres"}}Postgres{{else}}MySQL{{end}}. Migrations live in
+`db/migrations` and are managed with the `trails` CLI:
+
+    trails migrate create <name>   # generate a new migration
+    trails migrate up              # apply pending migrations
+    trails migrate down            # roll back the last migration
+
+A starter migration and example model (`app/models/example.go`) are already
+included — run `trails migrate up` before starting the app for the first time.
+{{if ne .Database "sqlite"}}
+This app expects a {{if eq .Database "postgres"}}Postgres{{else}}MySQL{{end}} server reachable with the
+credentials in `config/application.toml` (override per-environment in
+`config/environments/*.toml`, or via `TRAILS_DATABASE_*` env vars). For local
+development:
+
+{{if eq .Database "postgres"}}    docker run -d -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=app_development postgres:16-alpine
+{{else}}    docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=app_development mysql:8
+{{end}}{{end}}
+## Assets
+{{if eq .AssetsStrategy "bundler"}}
+This app builds its frontend with esbuild (JS) and Tailwind CLI (CSS) from
+`app/frontend/`. Build scripts live in `package.json`:
+
+    mise run deps      # npm install
+    mise run assets    # runs build:js + build:css, then fingerprints into public/assets
+
+`mise run build`/`mise run dev` already depend on `assets`, so this normally
+happens automatically.
+{{else}}
+This app ships with a plain, unbundled `public/assets/app.css` and no frontend
+build tooling. To add a bundler (Tailwind, esbuild, ...) later:
+
+1. Add a `package.json` with your build scripts.
+2. Run `trails assets build --scripts=<your-scripts>` to fingerprint the
+   output into `public/assets` and regenerate `manifest.json`.
+3. Switch `AssetsStrategy` in `app/boot.go` to `trails.AssetsStrategyBundler`.
+
+This app defaults to the `importmap` asset strategy. Pin a JS package with:
+
+    trails importmap pin <package>
+{{end}}
+## Optional subsystems
+
+trails also ships optional, opt-in subsystems not wired into this app by
+default:
+
+- **jobs** — background job registry + backends (`github.com/asimmons91/trails/jobs`)
+- **channels** — SSE/ActionCable-style pub-sub (`github.com/asimmons91/trails/channels`)
+
+Both are mountable as a `trails.Spur`. See their package docs to add them.
+
+## Project layout
+
+    app/
+      boot.go               entrypoint wiring (config, db, routes)
+      controllers/           request handlers + route table
+      models/                pack-backed models
+      views/                 html/template views (Rails-style controller/action convention)
+    config/                  application.toml + per-environment overrides
+    db/
+      db.go                  DB connection
+      migrations/             migration files
+    public/                  embedded static + asset files

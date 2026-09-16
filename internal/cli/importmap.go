@@ -12,7 +12,7 @@ import (
 )
 
 const importMapPath = "config/importmap.toml"
-const publicDir = "pubic"
+const publicDir = "public"
 const assetsSourcePath = "app/frontend"
 const assetsPrefix = "/assets"
 

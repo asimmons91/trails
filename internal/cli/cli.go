@@ -7,7 +7,10 @@ import (
 )
 
 type CLI struct {
-	Migrate MigrateCmd `cmd:"" help:"Manage DB migrations."`
+	New       NewCmd       `cmd:"" help:"Generate a new trails application."`
+	Migrate   MigrateCmd   `cmd:"" help:"Manage DB migrations."`
+	Assets    AssetsCmd    `cmd:"" help:"Build frontend assets."`
+	Importmap ImportmapCmd `cmd:"" help:"Manage the JS importmap."`
 }
 
 func Execute() {
@@ -25,7 +28,7 @@ func Execute() {
 	}
 
 	kctx, err := k.Parse(args)
-	kctx.FatalIfErrorf(err)
+	k.FatalIfErrorf(err)
 
 	err = kctx.Run()
 	k.FatalIfErrorf(err)

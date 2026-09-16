@@ -1,0 +1,21 @@
+package migrations
+
+import (
+	"context"
+
+	"github.com/asimmons91/trails/pack/migrate"
+
+	"{{.ModulePath}}/app/models"
+)
+
+func init() {
+	migrate.Register(migrate.Migration{
+		ID: "{{.MigrationID}}",
+		Migrate: func(ctx context.Context, m *migrate.Migrator) error {
+			return m.CreateTable(ctx, &models.Example{})
+		},
+		Rollback: func(ctx context.Context, m *migrate.Migrator) error {
+			return m.DropTable(ctx, &models.Example{})
+		},
+	})
+}

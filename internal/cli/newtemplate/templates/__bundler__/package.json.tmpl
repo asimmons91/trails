@@ -1,0 +1,13 @@
+{
+  "name": "{{.AppName}}",
+  "private": true,
+  "scripts": {
+    "build:js": "esbuild app/frontend/app.ts --bundle --minify --sourcemap --format=esm --outdir=app/frontend/builds",
+    "build:css": "npx @tailwindcss/cli -i app/frontend/app.css -o app/frontend/builds/app.css -m"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "@tailwindcss/cli": "^4.0.0",
+    "tailwindcss": "^4.0.0"
+  }
+}
