@@ -1,0 +1,30 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+bin/*
+!bin/.keep
+
+tmp/
+
+*.db
+*.db-shm
+*.db-wal
+
+# Credentials
+config/credentials/*.key
+{{if eq .AssetsStrategy "bundler"}}
+node_modules/
+
+app/frontend/builds/*
+!app/frontend/builds/.keep
+{{end}}

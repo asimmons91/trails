@@ -1,11 +1,14 @@
 package trails
 
 import (
+	"os"
 	"reflect"
 	"testing"
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/asimmons91/trails/internal/credentials"
 )
 
 func newSettingsFS(files map[string]string) fstest.MapFS {
@@ -130,6 +133,90 @@ func TestLoadReturnsWrappedErrorForInvalidEnvOverride(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "loading TRAILS_* env overrides")
 	require.Contains(t, err.Error(), "TRAILS_SERVER_PORT")
+}
+
+func chdirTemp(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	orig, err := os.Getwd()
+	require.NoError(t, err)
+
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(orig))
+	})
+}
+
+func encryptedCredentials(t *testing.T, key, plaintext string) string {
+	t.Helper()
+
+	encoded, err := credentials.Encrypt(key, []byte(plaintext))
+	require.NoError(t, err)
+
+	return encoded
+}
+
+func TestLoadConfigLayersDecryptedCredentialsOntoConfig(t *testing.T) {
+	key, err := credentials.GenerateKey()
+	require.NoError(t, err)
+	t.Setenv("TRAILS_MASTER_KEY", key)
+
+	fsys := newSettingsFS(map[string]string{
+		"application.toml":             testAppConfigBaseTOML,
+		"environments/staging.toml":    testAppConfigStagingOverlayTOML,
+		"credentials/staging.toml.enc": encryptedCredentials(t, key, "[server]\nport = 7777\n"),
+	})
+
+	cfg, err := LoadConfig[testAppConfig]("staging", fsys)
+	require.NoError(t, err)
+	require.Equal(t, 7777, cfg.Server.Port)
+}
+
+func TestLoadConfigTrailsEnvOverrideWinsOverCredentials(t *testing.T) {
+	key, err := credentials.GenerateKey()
+	require.NoError(t, err)
+	t.Setenv("TRAILS_MASTER_KEY", key)
+	t.Setenv("TRAILS_SERVER_PORT", "9999")
+
+	fsys := newSettingsFS(map[string]string{
+		"application.toml":             testAppConfigBaseTOML,
+		"environments/staging.toml":    testAppConfigStagingOverlayTOML,
+		"credentials/staging.toml.enc": encryptedCredentials(t, key, "[server]\nport = 7777\n"),
+	})
+
+	cfg, err := LoadConfig[testAppConfig]("staging", fsys)
+	require.NoError(t, err)
+	require.Equal(t, 9999, cfg.Server.Port)
+}
+
+func TestLoadConfigSucceedsWithNoCredentialsFilePresent(t *testing.T) {
+	fsys := newSettingsFS(map[string]string{
+		"application.toml":          testAppConfigBaseTOML,
+		"environments/staging.toml": testAppConfigStagingOverlayTOML,
+	})
+
+	cfg, err := LoadConfig[testAppConfig]("staging", fsys)
+	require.NoError(t, err)
+	require.Equal(t, 9090, cfg.Server.Port)
+}
+
+func TestLoadConfigReturnsWrappedErrorWhenCredentialsPresentButKeyMissing(t *testing.T) {
+	chdirTemp(t)
+	t.Setenv("TRAILS_MASTER_KEY", "")
+
+	key, err := credentials.GenerateKey()
+	require.NoError(t, err)
+
+	fsys := newSettingsFS(map[string]string{
+		"application.toml":             testAppConfigBaseTOML,
+		"environments/staging.toml":    testAppConfigStagingOverlayTOML,
+		"credentials/staging.toml.enc": encryptedCredentials(t, key, "[server]\nport = 7777\n"),
+	})
+
+	_, err = LoadConfig[testAppConfig]("staging", fsys)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "loading credentials for \"staging\"")
 }
 
 func TestApplyEnvOverridesSetsMatchingFields(t *testing.T) {

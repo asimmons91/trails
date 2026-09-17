@@ -2,10 +2,11 @@
 go = "1.27.1"
 golangci-lint = "latest"
 git-cliff = "latest"
+goreleaser = "latest"
 
 [tasks.check]
 description = "Run all checks for project"
-depends = ["fmt", "vet", "lint", "test"]
+depends = ["fmt", "vet", "lint", "test", "build-check"]
 
 [settings]
 jobs = 1

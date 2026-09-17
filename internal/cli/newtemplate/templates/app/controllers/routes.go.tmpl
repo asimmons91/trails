@@ -1,0 +1,20 @@
+package controllers
+
+import (
+	"io/fs"
+
+	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/pack"
+)
+
+func Routes(db *pack.DB, assetsFS, staticFS fs.FS) trails.RouteBuilder {
+	return func(r *trails.Router) {
+		r.Static("/assets/", assetsFS)
+		r.Static("/static/", staticFS)
+
+		examples := NewExamplesController(db)
+
+		r.Get("/examples", examples.Index)
+		r.Post("/examples", examples.Create)
+	}
+}

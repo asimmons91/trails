@@ -1,0 +1,6 @@
+[build]
+bin = "bin/{{.AppName}}"
+cmd = "go build -o bin/{{.AppName}} ./cmd/{{.AppName}}"
+include_ext = ["go", "gohtml", "css"{{if eq .AssetsStrategy "bundler"}}, "ts"{{end}}]
+exclude_dir = ["bin", "tmp"{{if eq .AssetsStrategy "bundler"}}, "app/frontend/builds", "public/assets", "node_modules"{{end}}]
+exclude_regex = ["_test.go"]

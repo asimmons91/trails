@@ -1,0 +1,13 @@
+package main
+
+import (
+	"log"
+
+	"{{.ModulePath}}/app"
+)
+
+func main() {
+	if err := app.Boot(); err != nil {
+		log.Fatal(err)
+	}
+}

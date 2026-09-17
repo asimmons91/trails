@@ -2,6 +2,7 @@ package trails
 
 import (
 	"errors"
+	"io/fs"
 	"net/http"
 	"slices"
 	"sync"
@@ -92,6 +93,16 @@ func (rt *Router) methodOverride(r *http.Request) *http.Request {
 func (rt *Router) HandleFunc(method, pattern string, h HandlerFunc) {
 	final := chain(h, rt.middleware)
 	rt.mux.HandleFunc(method+" "+pattern, rt.shim(final))
+}
+
+func (rt *Router) httpHandle(pattern string, h http.Handler) {
+	rt.mux.Handle(pattern, h)
+}
+
+// Static mounts fsys at prefix, serving files directly without going through
+// the HandlerFunc/Context shim.
+func (rt *Router) Static(prefix string, fsys fs.FS) {
+	rt.httpHandle(prefix, http.StripPrefix(prefix, http.FileServerFS(fsys)))
 }
 
 func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,30 @@
+package db
+
+import (
+	"fmt"
+
+	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/pack"
+	"github.com/asimmons91/trails/pack/driver/mysql"
+
+	"{{.ModulePath}}/config"
+)
+
+func ConnectWithConfig(cfg *config.Config) (*pack.DB, error) {
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%d)/%s?parseTime=true",
+		cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name,
+	)
+
+	return pack.Connect(mysql.New(), dsn)
+}
+
+func Connect() (*pack.DB, error) {
+	env := trails.Environment()
+	cfg, err := trails.LoadConfig[config.Config](env, config.ConfigFS)
+	if err != nil {
+		return nil, err
+	}
+
+	return ConnectWithConfig(cfg)
+}

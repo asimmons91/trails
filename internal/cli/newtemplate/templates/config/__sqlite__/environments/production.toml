@@ -1,0 +1,2 @@
+[database]
+path = "db/app_production.db"

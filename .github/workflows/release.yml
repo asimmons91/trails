@@ -32,9 +32,12 @@ jobs:
       - name: Preview Release
         if: ${{ inputs.dry_run }}
         run: mise run release-dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cut Release
         if: ${{ !inputs.dry_run }}
         run: mise run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

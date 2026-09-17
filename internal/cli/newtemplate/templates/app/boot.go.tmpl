@@ -1,0 +1,47 @@
+package app
+
+import (
+	"log/slog"
+	"os"
+
+	"github.com/asimmons91/trails"
+
+	"{{.ModulePath}}/app/controllers"
+	"{{.ModulePath}}/app/views"
+	"{{.ModulePath}}/config"
+	"{{.ModulePath}}/db"
+	"{{.ModulePath}}/public"
+)
+
+func Boot() error {
+	env := trails.Environment()
+
+	cfg, err := trails.LoadConfig[config.Config](env, config.ConfigFS)
+	if err != nil {
+		return err
+	}
+
+	pdb, err := db.ConnectWithConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	t, err := trails.New(trails.WithDefaultOptions(&trails.TrailOptions{
+		Host:         cfg.Server.Host,
+		Port:         cfg.Server.Port,
+		LayoutName:   cfg.Views.LayoutName,
+		Logger:       logger,
+		RouteBuilder: controllers.Routes(pdb, public.AssetsFS, public.StaticFS),
+		ViewFS:       views.ViewsFS,
+		ConfigFS:     config.ConfigFS,
+		AssetsFS:     public.AssetsFS,
+{{if eq .AssetsStrategy "bundler"}}		AssetsStrategy: trails.AssetsStrategyBundler,
+{{end}}	}))
+	if err != nil {
+		return err
+	}
+
+	return t.Run()
+}
