@@ -38,6 +38,12 @@ type TrailOptions struct {
 	// server by Trail.Run, and stopped on the same shutdown signal —
 	// typically built via RegisterSpurRunners(mounts...).
 	Runners []Runner
+	// RequestFuncMap, when set, is called once per Render to build a set of
+	// template functions scoped to the current request (e.g. a CSRF helper
+	// that needs the current session's token) and merged over FuncMap for
+	// that render only. Leave nil to skip the extra per-render template
+	// clone entirely — see csrf.RequestFuncMap for the built-in use case.
+	RequestFuncMap func(c *Context) template.FuncMap
 }
 
 func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
@@ -56,6 +62,7 @@ func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
 		Port:           opts.Port,
 		AssetsStrategy: opts.AssetsStrategy,
 		Runners:        opts.Runners,
+		RequestFuncMap: opts.RequestFuncMap,
 	}
 
 	if o.Context == nil {

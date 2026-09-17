@@ -6,8 +6,10 @@ import (
 
 	"github.com/asimmons91/trails"
 	"github.com/asimmons91/trails/cache"
+	"github.com/asimmons91/trails/csrf"
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/pack"
+	"github.com/asimmons91/trails/session"
 )
 
 // jobsBackend is available here for controllers that need to enqueue
@@ -19,10 +21,17 @@ import (
 // specific r.NewGroup of read-heavy, non-personalized routes. It is not
 // applied globally here since caching is opt-in per route, not a blanket
 // default.
-func Routes(db *pack.DB, jobsBackend jobs.Backend, cacheStore cache.Store, cacheTTL time.Duration, assetsFS, staticFS fs.FS) trails.RouteBuilder {
+func Routes(db *pack.DB, jobsBackend jobs.Backend, cacheStore cache.Store, cacheTTL time.Duration, secretKeyBase string, assetsFS, staticFS fs.FS) trails.RouteBuilder {
 	return func(r *trails.Router) {
 		r.Static("/assets/", assetsFS)
 		r.Static("/static/", staticFS)
+
+		// session must come before csrf: csrf.Middleware reads the current
+		// session's token via session.FromContext and panics if none is
+		// present on the Context. Both apply to every route registered
+		// below (Static above is unaffected — it bypasses middleware
+		// entirely).
+		r.Use(session.Middleware(secretKeyBase), csrf.Middleware())
 
 		examples := NewExamplesController(db)
 

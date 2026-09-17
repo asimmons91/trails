@@ -57,6 +57,11 @@ move secrets like the database password out of plaintext
 `config/environments/*.toml`. Anything else goes through
 `trails.LoadCredentials[config.Credentials]`.
 
+Each environment's credentials file is seeded with its own random
+`secret_key_base`, which encrypts session cookies (see `session.Middleware`
+in `app/controllers/routes.go`). Rotating it via `trails credentials edit`
+logs out every existing session — that's intentional, not a bug.
+
 ## Assets
 {{if eq .AssetsStrategy "bundler"}}
 This app builds its frontend with esbuild (JS) and Tailwind CLI (CSS) from
