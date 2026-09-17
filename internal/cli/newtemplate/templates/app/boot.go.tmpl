@@ -5,8 +5,11 @@ import (
 	"os"
 
 	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/jobs"
+	"github.com/asimmons91/trails/jobs/backend/async"
 
 	"{{.ModulePath}}/app/controllers"
+	"{{.ModulePath}}/app/mailers"
 	"{{.ModulePath}}/app/views"
 	"{{.ModulePath}}/config"
 	"{{.ModulePath}}/db"
@@ -28,12 +31,22 @@ func Boot() error {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
+	mailRenderer, mailTransport, err := mailers.Configure(cfg, logger)
+	if err != nil {
+		return err
+	}
+
+	jobsReg := jobs.NewRegistry()
+	mailers.Register(jobsReg, mailRenderer, mailTransport, cfg.Mailer.From)
+	jobsBackend := async.New(jobsReg, 2)
+	defer jobsBackend.Close()
+
 	t, err := trails.New(trails.WithDefaultOptions(&trails.TrailOptions{
 		Host:         cfg.Server.Host,
 		Port:         cfg.Server.Port,
 		LayoutName:   cfg.Views.LayoutName,
 		Logger:       logger,
-		RouteBuilder: controllers.Routes(pdb, public.AssetsFS, public.StaticFS),
+		RouteBuilder: controllers.Routes(pdb, jobsBackend, public.AssetsFS, public.StaticFS),
 		ViewFS:       views.ViewsFS,
 		ConfigFS:     config.ConfigFS,
 		AssetsFS:     public.AssetsFS,

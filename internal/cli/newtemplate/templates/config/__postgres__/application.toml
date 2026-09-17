@@ -12,3 +12,7 @@ user = "postgres"
 password = "postgres"
 name = "app"
 sslmode = "disable"
+
+[mailer]
+delivery = "log"
+from = "from@example.com"

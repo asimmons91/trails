@@ -1,0 +1,30 @@
+package mailers
+
+import (
+	"context"
+
+	"github.com/asimmons91/trails/mail"
+)
+
+// WelcomeEmail is an example mailer job. It embeds mail.Mailer to get
+// rendering + delivery (no `json:"-"` tag needed — Mailer's fields are
+// unexported, so jobs.Enqueue's JSON marshaling never sees them, and the
+// Renderer/Transport a jobs.Registry factory injects survive dispatch
+// untouched).
+//
+// Send it synchronously with job.Perform(ctx), or in the background via the
+// job queue: jobs.Enqueue(ctx, jobsBackend, job, jobs.WithQueue("mailers")).
+type WelcomeEmail struct {
+	mail.Mailer
+	Name  string
+	Email string
+}
+
+func (j *WelcomeEmail) Kind() string { return "mailers.welcome_email" }
+
+func (j *WelcomeEmail) Perform(ctx context.Context) error {
+	return j.Deliver(ctx, "user_mailer/welcome_email", mail.Message{
+		To:      []string{j.Email},
+		Subject: "Welcome!",
+	}, map[string]any{"Name": j.Name})
+}

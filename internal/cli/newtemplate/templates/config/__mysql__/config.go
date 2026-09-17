@@ -12,6 +12,7 @@ type Config struct {
 	Views    ViewsConfig    `toml:"views"`
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
+	Mailer   MailerConfig   `toml:"mailer"`
 }
 
 type ViewsConfig struct {
@@ -29,4 +30,17 @@ type DatabaseConfig struct {
 	User     string `toml:"user"`
 	Password string `toml:"password"`
 	Name     string `toml:"name"`
+}
+
+type MailerConfig struct {
+	Delivery string     `toml:"delivery"` // "log" or "smtp"
+	From     string     `toml:"from"`
+	SMTP     SMTPConfig `toml:"smtp"`
+}
+
+type SMTPConfig struct {
+	Host     string `toml:"host"`
+	Port     int    `toml:"port"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
 }

@@ -1,0 +1,35 @@
+package mailers_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/asimmons91/trails/mail"
+	"github.com/asimmons91/trails/mail/mailtest"
+	"github.com/stretchr/testify/require"
+
+	"{{.ModulePath}}/app/mailers"
+	"{{.ModulePath}}/app/mailers/views"
+)
+
+func TestWelcomeEmailDeliversRenderedContent(t *testing.T) {
+	renderer, err := mail.NewRenderer(views.ViewsFS, "mailer", nil)
+	require.NoError(t, err)
+
+	recorder := mailtest.NewRecorder()
+
+	job := &mailers.WelcomeEmail{
+		Mailer: mail.NewMailer(renderer, recorder, "from@example.com"),
+		Name:   "Ada",
+		Email:  "ada@example.com",
+	}
+
+	require.NoError(t, job.Perform(context.Background()))
+
+	require.True(t, mailtest.AssertSentTo(t, recorder, "ada@example.com"))
+
+	sent := recorder.Sent()[0]
+	require.Contains(t, sent.HTML, "Ada")
+	require.Contains(t, sent.Text, "Ada")
+	require.Equal(t, "from@example.com", sent.From)
+}

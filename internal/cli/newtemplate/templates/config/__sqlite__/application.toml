@@ -15,3 +15,7 @@ pragma = [
   "foreign_keys(1)",
   "auto_vacuum(FULL)",
 ]
+
+[mailer]
+delivery = "log"
+from = "from@example.com"
