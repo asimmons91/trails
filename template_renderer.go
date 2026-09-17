@@ -20,11 +20,19 @@ type Renderer interface {
 }
 
 type templateRenderer struct {
-	templates  map[string]*template.Template
-	layoutName string
+	templates map[string]*template.Template
+	// execTemplates holds a freely-executable copy of each action's
+	// template, used by RenderNamed/RenderBlock instead of templates when
+	// requestFuncMap is set. Render clones templates[name] per request (to
+	// bind request-scoped functions); html/template forbids Clone on a
+	// template that has ever been Execute'd, so RenderNamed must never
+	// execute the same object Render clones from — hence the split copy.
+	execTemplates  map[string]*template.Template
+	layoutName     string
+	requestFuncMap func(c *Context) template.FuncMap
 }
 
-func newTemplateRenderer(viewFs fs.FS, layoutName string, funcMap template.FuncMap) (Renderer, error) {
+func newTemplateRenderer(viewFs fs.FS, layoutName string, funcMap template.FuncMap, requestFuncMap func(c *Context) template.FuncMap) (Renderer, error) {
 	layoutMatches, err := fs.Glob(viewFs, "layouts/*.gohtml")
 	if err != nil {
 		return nil, fmt.Errorf("renderer: glob layouts: %w", err)
@@ -52,6 +60,10 @@ func newTemplateRenderer(viewFs fs.FS, layoutName string, funcMap template.FuncM
 	}
 
 	templates := map[string]*template.Template{}
+	var execTemplates map[string]*template.Template
+	if requestFuncMap != nil {
+		execTemplates = map[string]*template.Template{}
+	}
 
 	for _, entry := range entries {
 		if !entry.IsDir() || entry.Name() == "layouts" {
@@ -96,12 +108,22 @@ func newTemplateRenderer(viewFs fs.FS, layoutName string, funcMap template.FuncM
 				return nil, fmt.Errorf("renderer: parse %s: %w", key, err)
 			}
 			templates[key] = tmpl
+
+			if requestFuncMap != nil {
+				execCopy, err := tmpl.Clone()
+				if err != nil {
+					return nil, fmt.Errorf("renderer: clone %s for direct execution: %w", key, err)
+				}
+				execTemplates[key] = execCopy
+			}
 		}
 	}
 
 	return &templateRenderer{
-		templates:  templates,
-		layoutName: layoutName,
+		templates:      templates,
+		execTemplates:  execTemplates,
+		layoutName:     layoutName,
+		requestFuncMap: requestFuncMap,
 	}, nil
 }
 
@@ -111,11 +133,25 @@ func (t *templateRenderer) Render(c *Context, w io.Writer, name string, data any
 		return fmt.Errorf("renderer: template %q not found", name)
 	}
 
-	return tmpl.ExecuteTemplate(w, t.layoutName, data)
+	if t.requestFuncMap == nil {
+		return tmpl.ExecuteTemplate(w, t.layoutName, data)
+	}
+
+	clone, err := tmpl.Clone()
+	if err != nil {
+		return fmt.Errorf("renderer: clone %s: %w", name, err)
+	}
+
+	return clone.Funcs(t.requestFuncMap(c)).ExecuteTemplate(w, t.layoutName, data)
 }
 
 func (t *templateRenderer) RenderNamed(action, block string, data any) (template.HTML, error) {
-	tmpl, ok := t.templates[action]
+	templates := t.templates
+	if t.requestFuncMap != nil {
+		templates = t.execTemplates
+	}
+
+	tmpl, ok := templates[action]
 	if !ok {
 		return "", fmt.Errorf("renderer: template %q not found", action)
 	}

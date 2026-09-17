@@ -145,6 +145,6 @@ func ReadDecrypted(fsys fs.FS, environment string) (plaintext []byte, ok bool, e
 	return plaintext, true, nil
 }
 
-func DefaultContents() []byte {
-	return []byte("# Add secrets here, e.g.:\n# secret_key_base = \"...\"\n")
+func DefaultContents(secretKeyBase string) []byte {
+	return []byte("secret_key_base = \"" + secretKeyBase + "\"\n")
 }

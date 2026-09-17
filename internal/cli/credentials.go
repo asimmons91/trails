@@ -67,7 +67,11 @@ func (c *CredentialsEditCmd) Run() error {
 			return err
 		}
 	} else {
-		plaintext = credentials.DefaultContents()
+		secretKeyBase, err := credentials.GenerateKey()
+		if err != nil {
+			return err
+		}
+		plaintext = credentials.DefaultContents(secretKeyBase)
 	}
 
 	edited, err := editInEditor(plaintext)

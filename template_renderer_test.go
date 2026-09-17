@@ -34,7 +34,7 @@ func TestNewTemplateRendererBuildsActionKeyedByControllerAndName(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}Hello, {{.Name}}!{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -50,7 +50,7 @@ func TestNewTemplateRendererMakesPartialsAvailableButNotRegistered(t *testing.T)
 		"posts/index.gohtml":         mapFile(`{{define "content"}}{{template "nav" .}}body{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	tr := renderer.(*templateRenderer)
@@ -72,7 +72,7 @@ func TestRenderNamedRendersBlockFromActionTemplateSet(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}{{template "card" .}}{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	html, err := renderer.RenderNamed("posts/index", "card", map[string]string{"Name": "World"})
@@ -86,7 +86,7 @@ func TestRenderNamedReturnsErrorForUnknownAction(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	_, err = renderer.RenderNamed("posts/missing", "card", nil)
@@ -99,7 +99,7 @@ func TestRenderNamedReturnsErrorForUnknownBlock(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	_, err = renderer.RenderNamed("posts/index", "missing", nil)
@@ -112,7 +112,7 @@ func TestNewTemplateRendererSkipsLayoutsDirectoryAsController(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	tr := renderer.(*templateRenderer)
@@ -128,7 +128,7 @@ func TestNewTemplateRendererSkipsNonGohtmlFilesInControllerDir(t *testing.T) {
 		"posts/notes.txt":            mapFile("not a template"),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	tr := renderer.(*templateRenderer)
@@ -144,7 +144,7 @@ func TestNewTemplateRendererSkipsNonDirectoryEntriesAtRoot(t *testing.T) {
 		"README.md":                  mapFile("not a controller"),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	tr := renderer.(*templateRenderer)
@@ -160,7 +160,7 @@ func TestNewTemplateRendererSupportsMultipleControllersAndActions(t *testing.T) 
 		"users/show.gohtml":          mapFile(`{{define "content"}}users-show{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	tr := renderer.(*templateRenderer)
@@ -180,7 +180,7 @@ func TestNewTemplateRendererWiresFuncMapIntoTemplates(t *testing.T) {
 		"shout": func(s string) string { return strings.ToUpper(s) + "!" },
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", funcs)
+	renderer, err := newTemplateRenderer(viewFS, "application", funcs, nil)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -195,7 +195,7 @@ func TestNewTemplateRendererReturnsErrorWhenViewsRootUnreadable(t *testing.T) {
 		failReadDir: ".",
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.Nil(t, renderer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "read views root")
@@ -210,7 +210,7 @@ func TestNewTemplateRendererReturnsErrorWhenControllerDirUnreadable(t *testing.T
 		failReadDir: "posts",
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.Nil(t, renderer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "read posts")
@@ -222,7 +222,7 @@ func TestNewTemplateRendererReturnsErrorOnParseFailure(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}{{.Broken`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.Nil(t, renderer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "renderer: parse")
@@ -236,7 +236,7 @@ func TestNewTemplateRendererLoadsUnderscoredLayoutPartial(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}body{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -252,7 +252,7 @@ func TestNewTemplateRendererExcludesNonMatchingLayoutFile(t *testing.T) {
 		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 
 	tr := renderer.(*templateRenderer)
@@ -264,7 +264,7 @@ func TestNewTemplateRendererExcludesNonMatchingLayoutFile(t *testing.T) {
 func TestNewTemplateRendererSucceedsWithNoLayoutsDirectory(t *testing.T) {
 	viewFS := fstest.MapFS{}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, renderer)
 
@@ -278,7 +278,7 @@ func TestNewTemplateRendererReturnsErrorWhenNoLayoutMatchesConfiguredName(t *tes
 		"posts/index.gohtml":   mapFile(`{{define "content"}}hi{{end}}`),
 	}
 
-	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
 	require.Nil(t, renderer)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "renderer: layout")
@@ -340,4 +340,71 @@ func TestRenderPropagatesWriterError(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "write failed")
+}
+
+func TestNewTemplateRendererWithoutRequestFuncMapLeavesExecTemplatesNil(t *testing.T) {
+	viewFS := fstest.MapFS{
+		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),
+		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
+	}
+
+	renderer, err := newTemplateRenderer(viewFS, "application", nil, nil)
+	require.NoError(t, err)
+
+	tr := renderer.(*templateRenderer)
+	require.Nil(t, tr.execTemplates)
+}
+
+func TestRequestFuncMapAppliedPerRequest(t *testing.T) {
+	viewFS := fstest.MapFS{
+		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),
+		"posts/index.gohtml":         mapFile(`{{define "content"}}{{greeting}}{{end}}`),
+	}
+	placeholder := template.FuncMap{"greeting": func() string { return "" }}
+
+	renderer, err := newTemplateRenderer(viewFS, "application", placeholder, func(c *Context) template.FuncMap {
+		return template.FuncMap{"greeting": func() string { return c.Get[string]("name") }}
+	})
+	require.NoError(t, err)
+
+	c1 := newContext(nil, nil, nil)
+	c1.Set("name", "alice")
+	var buf1 bytes.Buffer
+	require.NoError(t, renderer.Render(c1, &buf1, "posts/index", nil))
+	require.Equal(t, "alice", buf1.String())
+
+	c2 := newContext(nil, nil, nil)
+	c2.Set("name", "bob")
+	var buf2 bytes.Buffer
+	require.NoError(t, renderer.Render(c2, &buf2, "posts/index", nil))
+	require.Equal(t, "bob", buf2.String())
+}
+
+func TestTemplateRendererRenderThenRenderNamedWithRequestFuncMapSet(t *testing.T) {
+	viewFS := fstest.MapFS{
+		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),
+		"posts/_card.gohtml":         mapFile(`{{define "card"}}card:{{greeting}}{{end}}`),
+		"posts/index.gohtml":         mapFile(`{{define "content"}}{{template "card" .}}{{end}}`),
+	}
+	placeholder := template.FuncMap{"greeting": func() string { return "" }}
+
+	renderer, err := newTemplateRenderer(viewFS, "application", placeholder, func(c *Context) template.FuncMap {
+		return template.FuncMap{"greeting": func() string { return "hi" }}
+	})
+	require.NoError(t, err)
+
+	// A prior Render (which internally Clones templates["posts/index"]) must
+	// not prevent a later RenderNamed on the same action — RenderNamed uses
+	// the separate execTemplates copy specifically to avoid this.
+	c := newContext(nil, nil, nil)
+	var buf bytes.Buffer
+	require.NoError(t, renderer.Render(c, &buf, "posts/index", nil))
+
+	html, err := renderer.RenderNamed("posts/index", "card", nil)
+	require.NoError(t, err)
+	require.Equal(t, template.HTML("card:"), html)
+
+	// And it keeps working across repeated calls.
+	_, err = renderer.RenderNamed("posts/index", "card", nil)
+	require.NoError(t, err)
 }

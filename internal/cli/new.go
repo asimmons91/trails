@@ -223,7 +223,12 @@ func writeNewCredentials(target string) error {
 		return err
 	}
 
-	encoded, err := credentials.Encrypt(key, credentials.DefaultContents())
+	secretKeyBase, err := credentials.GenerateKey()
+	if err != nil {
+		return err
+	}
+
+	encoded, err := credentials.Encrypt(key, credentials.DefaultContents(secretKeyBase))
 	if err != nil {
 		return err
 	}

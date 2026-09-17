@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/csrf"
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/jobs/backend/async"
 
@@ -21,6 +22,11 @@ func Boot() error {
 	env := trails.Environment()
 
 	cfg, err := trails.LoadConfig[config.Config](env, config.ConfigFS)
+	if err != nil {
+		return err
+	}
+
+	creds, err := trails.LoadCredentials[config.Credentials](env, config.ConfigFS)
 	if err != nil {
 		return err
 	}
@@ -56,15 +62,17 @@ func Boot() error {
 	}
 
 	t, err := trails.New(trails.WithDefaultOptions(&trails.TrailOptions{
-		Host:         cfg.Server.Host,
-		Port:         cfg.Server.Port,
-		LayoutName:   cfg.Views.LayoutName,
-		Logger:       logger,
-		RouteBuilder: controllers.Routes(pdb, jobsBackend, cacheStore, cacheTTL, public.AssetsFS, public.StaticFS),
-		ViewFS:       views.ViewsFS,
-		ConfigFS:     config.ConfigFS,
-		AssetsFS:     public.AssetsFS,
-		Runners:      runners,
+		Host:           cfg.Server.Host,
+		Port:           cfg.Server.Port,
+		LayoutName:     cfg.Views.LayoutName,
+		Logger:         logger,
+		RouteBuilder:   controllers.Routes(pdb, jobsBackend, cacheStore, cacheTTL, creds.SecretKeyBase, public.AssetsFS, public.StaticFS),
+		ViewFS:         views.ViewsFS,
+		ConfigFS:       config.ConfigFS,
+		AssetsFS:       public.AssetsFS,
+		Runners:        runners,
+		FuncMap:        csrf.PlaceholderFuncMap,
+		RequestFuncMap: csrf.RequestFuncMap,
 {{if eq .AssetsStrategy "bundler"}}		AssetsStrategy: trails.AssetsStrategyBundler,
 {{end}}	}))
 	if err != nil {
