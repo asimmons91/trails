@@ -19,3 +19,7 @@ pragma = [
 [mailer]
 delivery = "log"
 from = "from@example.com"
+
+[cache]
+store = "memory"
+ttl = "5m"

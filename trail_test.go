@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -135,6 +137,23 @@ func TestNewSetsUpRenderer(t *testing.T) {
 	trail := newTestTrail(t, &TrailOptions{})
 
 	require.NotNil(t, trail.renderer)
+}
+
+func TestNewMergesFuncMapIntoRenderer(t *testing.T) {
+	trail := newTestTrail(t, &TrailOptions{
+		ViewFS: fstest.MapFS{
+			"layouts/application.gohtml": &fstest.MapFile{Data: []byte(`{{define "application"}}{{template "content" .}}{{end}}`)},
+			"posts/index.gohtml":         &fstest.MapFile{Data: []byte(`{{define "content"}}{{shout "hi"}}{{end}}`)},
+		},
+		FuncMap: template.FuncMap{
+			"shout": func(s string) string { return strings.ToUpper(s) },
+		},
+	})
+
+	var buf bytes.Buffer
+	err := trail.renderer.Render(nil, &buf, "posts/index", nil)
+	require.NoError(t, err)
+	require.Equal(t, "HI", buf.String())
 }
 
 func TestNewSetsUpRouter(t *testing.T) {

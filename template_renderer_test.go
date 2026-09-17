@@ -65,6 +65,47 @@ func TestNewTemplateRendererMakesPartialsAvailableButNotRegistered(t *testing.T)
 	require.Equal(t, "[nav]body", buf.String())
 }
 
+func TestRenderNamedRendersBlockFromActionTemplateSet(t *testing.T) {
+	viewFS := fstest.MapFS{
+		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),
+		"posts/_card.gohtml":         mapFile(`{{define "card"}}card:{{.Name}}{{end}}`),
+		"posts/index.gohtml":         mapFile(`{{define "content"}}{{template "card" .}}{{end}}`),
+	}
+
+	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	require.NoError(t, err)
+
+	html, err := renderer.RenderNamed("posts/index", "card", map[string]string{"Name": "World"})
+	require.NoError(t, err)
+	require.Equal(t, template.HTML("card:World"), html)
+}
+
+func TestRenderNamedReturnsErrorForUnknownAction(t *testing.T) {
+	viewFS := fstest.MapFS{
+		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),
+		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
+	}
+
+	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	require.NoError(t, err)
+
+	_, err = renderer.RenderNamed("posts/missing", "card", nil)
+	require.Error(t, err)
+}
+
+func TestRenderNamedReturnsErrorForUnknownBlock(t *testing.T) {
+	viewFS := fstest.MapFS{
+		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),
+		"posts/index.gohtml":         mapFile(`{{define "content"}}hi{{end}}`),
+	}
+
+	renderer, err := newTemplateRenderer(viewFS, "application", nil)
+	require.NoError(t, err)
+
+	_, err = renderer.RenderNamed("posts/index", "missing", nil)
+	require.Error(t, err)
+}
+
 func TestNewTemplateRendererSkipsLayoutsDirectoryAsController(t *testing.T) {
 	viewFS := fstest.MapFS{
 		"layouts/application.gohtml": mapFile(`{{define "application"}}{{template "content" .}}{{end}}`),

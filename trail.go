@@ -85,7 +85,12 @@ func (t *Trail) setupViews(o *TrailOptions) error {
 		}
 	}
 
-	renderer, err := newTemplateRenderer(o.ViewFS, o.LayoutName, assets.FuncMap(manifest, "/assets", importMapTag))
+	funcMap := assets.FuncMap(manifest, "/assets", importMapTag)
+	for name, fn := range o.FuncMap {
+		funcMap[name] = fn
+	}
+
+	renderer, err := newTemplateRenderer(o.ViewFS, o.LayoutName, funcMap)
 	if err != nil {
 		return fmt.Errorf("trails: loading templates: %w", err)
 	}

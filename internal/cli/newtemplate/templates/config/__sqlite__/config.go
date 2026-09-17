@@ -13,6 +13,7 @@ type Config struct {
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
 	Mailer   MailerConfig   `toml:"mailer"`
+	Cache    CacheConfig    `toml:"cache"`
 }
 
 type ViewsConfig struct {
@@ -40,4 +41,9 @@ type SMTPConfig struct {
 	Port     int    `toml:"port"`
 	Username string `toml:"username"`
 	Password string `toml:"password"`
+}
+
+type CacheConfig struct {
+	Store string `toml:"store"` // "memory" for now
+	TTL   string `toml:"ttl"`   // time.ParseDuration'd, e.g. "5m"
 }

@@ -2,6 +2,7 @@ package trails
 
 import (
 	"context"
+	"html/template"
 	"io/fs"
 	"log/slog"
 )
@@ -15,16 +16,21 @@ const (
 )
 
 type TrailOptions struct {
-	Context        context.Context
-	Logger         *slog.Logger
-	ViewFS         fs.FS
-	AssetsFS       fs.FS
-	ConfigFS       fs.FS
-	ErrorHandler   ErrorHandlerFunc
-	RouteBuilder   RouteBuilder
-	Renderer       Renderer
-	Binder         Binder
-	LayoutName     string
+	Context      context.Context
+	Logger       *slog.Logger
+	ViewFS       fs.FS
+	AssetsFS     fs.FS
+	ConfigFS     fs.FS
+	ErrorHandler ErrorHandlerFunc
+	RouteBuilder RouteBuilder
+	Renderer     Renderer
+	Binder       Binder
+	LayoutName   string
+	// FuncMap is merged over the framework's built-in template functions
+	// (asset_path, etc.), letting apps register their own view helpers —
+	// e.g. a "cached" helper closing over a cache.Store for fragment
+	// caching (see cache.FetchFragment).
+	FuncMap        template.FuncMap
 	Host           string
 	Port           int
 	AssetsStrategy AssetsStrategy
@@ -45,6 +51,7 @@ func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
 		RouteBuilder:   opts.RouteBuilder,
 		Binder:         opts.Binder,
 		LayoutName:     opts.LayoutName,
+		FuncMap:        opts.FuncMap,
 		Host:           opts.Host,
 		Port:           opts.Port,
 		AssetsStrategy: opts.AssetsStrategy,
