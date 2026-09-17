@@ -4,19 +4,27 @@ import (
 	"time"
 
 	"github.com/asimmons91/trails/cache"
+	"github.com/asimmons91/trails/cache/backend/database"
 	"github.com/asimmons91/trails/cache/backend/memory"
+	"github.com/asimmons91/trails/pack"
 
 	"{{.ModulePath}}/config"
 )
 
 // Configure builds the cache.Store for this app and the default TTL new
-// entries should use. Only an in-process memory store is supported today;
-// cfg.Cache.Store is read now so a future backend (file, redis, ...) can be
-// selected the same way mailers.Configure picks a mail.Transport.
-func Configure(cfg *config.Config) (cache.Store, time.Duration, error) {
+// entries should use, based on cfg.Cache.Store ("memory" or "database").
+//
+// The database store persists entries in a cache_entries table via pack —
+// register database.Migration in your own db/migrations package before
+// switching to it (see cache/backend/database's doc comment).
+func Configure(cfg *config.Config, db *pack.DB) (cache.Store, time.Duration, error) {
 	ttl, err := time.ParseDuration(cfg.Cache.TTL)
 	if err != nil {
 		return nil, 0, err
+	}
+
+	if cfg.Cache.Store == "database" {
+		return database.New(db), ttl, nil
 	}
 
 	return memory.New(), ttl, nil

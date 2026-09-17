@@ -47,6 +47,6 @@ type SMTPConfig struct {
 }
 
 type CacheConfig struct {
-	Store string `toml:"store"` // "memory" for now
+	Store string `toml:"store"` // "memory" or "database"
 	TTL   string `toml:"ttl"`   // time.ParseDuration'd, e.g. "5m"
 }

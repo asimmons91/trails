@@ -97,6 +97,17 @@ no extra infrastructure but doesn't persist across restarts; swap in
 register your own job kinds on the same `jobs.Registry` for other background
 work.
 
+`cache` (`github.com/asimmons91/trails/cache`) works the same way — this app
+uses the in-process `cache/backend/memory` store by default (see
+`app/cache/cache.go`). Set `store = "database"` in `[cache]` to switch to
+`cache/backend/database` instead, a SolidCache-style store backed by a
+`cache_entries` table via `pack` — first register its migration yourself,
+e.g. in `db/migrations/cache.go`:
+
+    func init() {
+    	migrate.Register(database.Migration)
+    }
+
 ## Mailers
 
 `app/mailers/` holds mailer jobs, built on `github.com/asimmons91/trails/mail`.

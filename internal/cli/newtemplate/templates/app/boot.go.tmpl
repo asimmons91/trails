@@ -42,7 +42,7 @@ func Boot() error {
 	jobsBackend := async.New(jobsReg, 2)
 	defer jobsBackend.Close()
 
-	cacheStore, cacheTTL, err := appcache.Configure(cfg)
+	cacheStore, cacheTTL, err := appcache.Configure(cfg, pdb)
 	if err != nil {
 		return err
 	}
