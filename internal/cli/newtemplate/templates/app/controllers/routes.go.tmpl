@@ -4,10 +4,13 @@ import (
 	"io/fs"
 
 	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/pack"
 )
 
-func Routes(db *pack.DB, assetsFS, staticFS fs.FS) trails.RouteBuilder {
+// jobsBackend is available here for controllers that need to enqueue
+// background work — e.g. jobs.Enqueue(ctx, jobsBackend, &mailers.WelcomeEmail{...}).
+func Routes(db *pack.DB, jobsBackend jobs.Backend, assetsFS, staticFS fs.FS) trails.RouteBuilder {
 	return func(r *trails.Router) {
 		r.Static("/assets/", assetsFS)
 		r.Static("/static/", staticFS)

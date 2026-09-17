@@ -1,2 +1,11 @@
 [database]
 path = "db/app_production.db"
+
+[mailer]
+delivery = "smtp"
+
+[mailer.smtp]
+host = "smtp.example.com"
+port = 587
+# username/password are secrets — set them with:
+#   trails credentials edit --environment=production

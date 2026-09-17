@@ -11,3 +11,7 @@ port = 3306
 user = "root"
 password = "root"
 name = "app"
+
+[mailer]
+delivery = "log"
+from = "from@example.com"

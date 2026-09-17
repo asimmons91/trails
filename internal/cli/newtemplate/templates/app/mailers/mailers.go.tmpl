@@ -1,0 +1,45 @@
+package mailers
+
+import (
+	"log/slog"
+
+	"github.com/asimmons91/trails/jobs"
+	"github.com/asimmons91/trails/mail"
+	"github.com/asimmons91/trails/mail/transport/smtp"
+
+	"{{.ModulePath}}/app/mailers/views"
+	"{{.ModulePath}}/config"
+)
+
+// Configure builds the mail Renderer and Transport for this app: an SMTP
+// transport when cfg.Mailer.Delivery is "smtp" (see
+// config/environments/production.toml), otherwise a Transport that logs
+// rendered emails instead of sending them — a safe default for local
+// development.
+func Configure(cfg *config.Config, logger *slog.Logger) (mail.Renderer, mail.Transport, error) {
+	renderer, err := mail.NewRenderer(views.ViewsFS, "mailer", nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if cfg.Mailer.Delivery == "smtp" {
+		transport := smtp.New(smtp.Config{
+			Host:     cfg.Mailer.SMTP.Host,
+			Port:     cfg.Mailer.SMTP.Port,
+			Username: cfg.Mailer.SMTP.Username,
+			Password: cfg.Mailer.SMTP.Password,
+		})
+		return renderer, transport, nil
+	}
+
+	return renderer, mail.NewLogTransport(logger), nil
+}
+
+// Register wires every mailer job kind into reg with the given
+// Renderer/Transport injected — the DI pattern jobs.Registry expects (see
+// jobs.Registry.Register).
+func Register(reg *jobs.Registry, renderer mail.Renderer, transport mail.Transport, from string) {
+	reg.Register((&WelcomeEmail{}).Kind(), func() jobs.Job {
+		return &WelcomeEmail{Mailer: mail.NewMailer(renderer, transport, from)}
+	})
+}

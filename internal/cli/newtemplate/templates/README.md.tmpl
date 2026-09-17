@@ -85,16 +85,49 @@ This app defaults to the `importmap` asset strategy. Pin a JS package with:
 trails also ships optional, opt-in subsystems not wired into this app by
 default:
 
-- **jobs** — background job registry + backends (`github.com/asimmons91/trails/jobs`)
 - **channels** — SSE/ActionCable-style pub-sub (`github.com/asimmons91/trails/channels`)
 
-Both are mountable as a `trails.Spur`. See their package docs to add them.
+It's mountable as a `trails.Spur`. See its package docs to add it.
+
+`jobs` (`github.com/asimmons91/trails/jobs`) isn't fully unwired, though — this
+app already runs an in-process `jobs.Registry` + `jobs/backend/async` worker
+pool (see `app/boot.go`) to deliver mail in the background. `async` requires
+no extra infrastructure but doesn't persist across restarts; swap in
+`jobs/backend/dbqueue` or `jobs/backend/cloudtask` for durable delivery, or
+register your own job kinds on the same `jobs.Registry` for other background
+work.
+
+## Mailers
+
+`app/mailers/` holds mailer jobs, built on `github.com/asimmons91/trails/mail`.
+A mailer is just a `jobs.Job` that embeds `mail.Mailer` to get rendering +
+delivery — see `app/mailers/user_mailer.go` (`WelcomeEmail`) for the pattern.
+Views live in `app/mailers/views/<mailer>/<action>.gohtml`, wrapped in the
+`app/mailers/views/layouts/mailer.gohtml` layout, same controller/action
+convention as `app/views`. An optional sibling `<action>.text.gohtml` (plain
+`text/template`, no layout) renders the plain-text alternative part.
+
+Deliver a mailer synchronously with `job.Perform(ctx)`, or in the background
+through the job queue already wired in `app/boot.go`:
+
+    jobs.Enqueue(ctx, jobsBackend, &mailers.WelcomeEmail{...}, jobs.WithQueue("mailers"))
+
+`[mailer]` in `config/application.toml` / `config/environments/*.toml`
+controls delivery: `delivery = "log"` (the development default) logs
+rendered emails instead of sending them; `delivery = "smtp"` (the production
+default) sends via `[mailer.smtp]` — set `username`/`password` as secrets
+with `trails credentials edit --environment=production`, matching how
+database passwords are handled.
+
+In tests, swap in `github.com/asimmons91/trails/mail/mailtest.Recorder` for
+the transport and assert against it — see `app/mailers/user_mailer_test.go`.
 
 ## Project layout
 
     app/
-      boot.go               entrypoint wiring (config, db, routes)
+      boot.go               entrypoint wiring (config, db, jobs, mail, routes)
       controllers/           request handlers + route table
+      mailers/                mail.Mailer-backed jobs + their views
       models/                pack-backed models
       views/                 html/template views (Rails-style controller/action convention)
     config/                  application.toml + per-environment overrides
