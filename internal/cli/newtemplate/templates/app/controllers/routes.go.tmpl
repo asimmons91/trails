@@ -2,15 +2,24 @@ package controllers
 
 import (
 	"io/fs"
+	"time"
 
 	"github.com/asimmons91/trails"
+	"github.com/asimmons91/trails/cache"
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/pack"
 )
 
 // jobsBackend is available here for controllers that need to enqueue
 // background work — e.g. jobs.Enqueue(ctx, jobsBackend, &mailers.WelcomeEmail{...}).
-func Routes(db *pack.DB, jobsBackend jobs.Backend, assetsFS, staticFS fs.FS) trails.RouteBuilder {
+//
+// cacheStore and cacheTTL are available for controllers that need caching —
+// e.g. cache.Fetch(ctx, cacheStore, key, cacheTTL, func() (...) { ... }), or
+// httpcache.Middleware(cacheStore, httpcache.WithTTL(cacheTTL)) applied to a
+// specific r.NewGroup of read-heavy, non-personalized routes. It is not
+// applied globally here since caching is opt-in per route, not a blanket
+// default.
+func Routes(db *pack.DB, jobsBackend jobs.Backend, cacheStore cache.Store, cacheTTL time.Duration, assetsFS, staticFS fs.FS) trails.RouteBuilder {
 	return func(r *trails.Router) {
 		r.Static("/assets/", assetsFS)
 		r.Static("/static/", staticFS)

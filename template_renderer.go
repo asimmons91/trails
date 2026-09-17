@@ -1,6 +1,7 @@
 package trails
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io"
@@ -11,6 +12,11 @@ import (
 
 type Renderer interface {
 	Render(c *Context, w io.Writer, name string, data any) error
+
+	// RenderNamed renders the named block ({{define "block"}}...{{end}})
+	// belonging to action's template set to a string, without executing
+	// the layout. It backs Context.RenderBlock.
+	RenderNamed(action, block string, data any) (template.HTML, error)
 }
 
 type templateRenderer struct {
@@ -106,4 +112,18 @@ func (t *templateRenderer) Render(c *Context, w io.Writer, name string, data any
 	}
 
 	return tmpl.ExecuteTemplate(w, t.layoutName, data)
+}
+
+func (t *templateRenderer) RenderNamed(action, block string, data any) (template.HTML, error) {
+	tmpl, ok := t.templates[action]
+	if !ok {
+		return "", fmt.Errorf("renderer: template %q not found", action)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, block, data); err != nil {
+		return "", fmt.Errorf("renderer: block %q in %q: %w", block, action, err)
+	}
+
+	return template.HTML(buf.String()), nil
 }

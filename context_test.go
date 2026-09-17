@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -51,6 +52,11 @@ type mockRenderer struct {
 	data    any
 	written []byte
 	err     error
+
+	namedAction string
+	namedBlock  string
+	namedHTML   template.HTML
+	namedErr    error
 }
 
 func (m *mockRenderer) Render(c *Context, w io.Writer, name string, data any) error {
@@ -62,6 +68,16 @@ func (m *mockRenderer) Render(c *Context, w io.Writer, name string, data any) er
 	}
 	_, err := w.Write(m.written)
 	return err
+}
+
+func (m *mockRenderer) RenderNamed(action, block string, data any) (template.HTML, error) {
+	m.namedAction = action
+	m.namedBlock = block
+	m.data = data
+	if m.namedErr != nil {
+		return "", m.namedErr
+	}
+	return m.namedHTML, nil
 }
 
 func TestContextGetSetRoundTrip(t *testing.T) {
@@ -113,6 +129,51 @@ func TestContextRenderReturnsWrappedRendererError(t *testing.T) {
 
 	require.Empty(t, w.Body.String())
 	require.Empty(t, w.Header().Get("Content-Type"))
+}
+
+func TestContextRenderBlockUsesActionFromLastRender(t *testing.T) {
+	renderer := &mockRenderer{written: []byte("<p>hi</p>"), namedHTML: template.HTML("<span>card</span>")}
+	trail := &Trail{renderer: renderer}
+	w := httptest.NewRecorder()
+	c := newContext(w, nil, trail)
+
+	require.NoError(t, c.Render(200, "products/show", nil))
+
+	html, err := c.RenderBlock("card", map[string]string{"id": "1"})
+	require.NoError(t, err)
+	require.Equal(t, template.HTML("<span>card</span>"), html)
+	require.Equal(t, "products/show", renderer.namedAction)
+	require.Equal(t, "card", renderer.namedBlock)
+}
+
+func TestContextRenderBlockBeforeRenderReturnsError(t *testing.T) {
+	renderer := &mockRenderer{}
+	trail := &Trail{renderer: renderer}
+	c := newContext(nil, nil, trail)
+
+	_, err := c.RenderBlock("card", nil)
+	require.Error(t, err)
+}
+
+func TestContextRenderBlockWrapsRendererError(t *testing.T) {
+	sentinel := errors.New("boom")
+	renderer := &mockRenderer{written: []byte("<p>hi</p>"), namedErr: sentinel}
+	trail := &Trail{renderer: renderer}
+	w := httptest.NewRecorder()
+	c := newContext(w, nil, trail)
+	require.NoError(t, c.Render(200, "products/show", nil))
+
+	_, err := c.RenderBlock("card", nil)
+	require.ErrorIs(t, err, sentinel)
+}
+
+func TestContextSetResponseSwapsWriter(t *testing.T) {
+	c := newContext(httptest.NewRecorder(), nil, nil)
+
+	replacement := httptest.NewRecorder()
+	c.SetResponse(replacement)
+
+	require.Same(t, http.ResponseWriter(replacement), c.Response())
 }
 
 func TestContextGetMissingKeyReturnsZeroValue(t *testing.T) {

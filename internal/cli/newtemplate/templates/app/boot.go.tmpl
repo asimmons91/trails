@@ -8,6 +8,7 @@ import (
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/jobs/backend/async"
 
+	"{{.ModulePath}}/app/cache"
 	"{{.ModulePath}}/app/controllers"
 	"{{.ModulePath}}/app/mailers"
 	"{{.ModulePath}}/app/views"
@@ -41,15 +42,29 @@ func Boot() error {
 	jobsBackend := async.New(jobsReg, 2)
 	defer jobsBackend.Close()
 
+	cacheStore, cacheTTL, err := appcache.Configure(cfg)
+	if err != nil {
+		return err
+	}
+
+	// The memory cache backend needs a background sweep loop to evict
+	// expired entries; other backends (file, redis, ...) won't implement
+	// trails.Runner and are simply skipped here.
+	var runners []trails.Runner
+	if runner, ok := any(cacheStore).(trails.Runner); ok {
+		runners = append(runners, runner)
+	}
+
 	t, err := trails.New(trails.WithDefaultOptions(&trails.TrailOptions{
 		Host:         cfg.Server.Host,
 		Port:         cfg.Server.Port,
 		LayoutName:   cfg.Views.LayoutName,
 		Logger:       logger,
-		RouteBuilder: controllers.Routes(pdb, jobsBackend, public.AssetsFS, public.StaticFS),
+		RouteBuilder: controllers.Routes(pdb, jobsBackend, cacheStore, cacheTTL, public.AssetsFS, public.StaticFS),
 		ViewFS:       views.ViewsFS,
 		ConfigFS:     config.ConfigFS,
 		AssetsFS:     public.AssetsFS,
+		Runners:      runners,
 {{if eq .AssetsStrategy "bundler"}}		AssetsStrategy: trails.AssetsStrategyBundler,
 {{end}}	}))
 	if err != nil {

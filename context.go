@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -31,6 +32,7 @@ type Context struct {
 	lock     sync.RWMutex
 	request  *http.Request
 	response http.ResponseWriter
+	action   string
 }
 
 func newContext(w http.ResponseWriter, r *http.Request, t *Trail) *Context {
@@ -52,6 +54,7 @@ func (c *Context) writeContentType(contentType string) {
 func (c *Context) Reset(w http.ResponseWriter, r *http.Request) {
 	c.request = r
 	c.response = w
+	c.action = ""
 	clear(c.store)
 }
 
@@ -76,6 +79,11 @@ func (c *Context) Set(key string, val any) {
 func (c *Context) Request() *http.Request { return c.request }
 
 func (c *Context) Response() http.ResponseWriter { return c.response }
+
+// SetResponse swaps the ResponseWriter a handler writes to. Middleware uses
+// this to interpose a recording or buffering writer around the rest of the
+// chain (see cache/httpcache).
+func (c *Context) SetResponse(w http.ResponseWriter) { c.response = w }
 
 func (c *Context) Logger() *slog.Logger { return c.trail.logger }
 
@@ -126,10 +134,29 @@ func (c *Context) JSON(code int, j any) error {
 }
 
 func (c *Context) Render(code int, name string, data any) error {
+	c.action = name
+
 	buf := &bytes.Buffer{}
 	if err := c.trail.renderer.Render(c, buf, name, data); err != nil {
 		return fmt.Errorf("context: render template %s: %w", name, err)
 	}
 
 	return c.HTMLBlob(code, buf.Bytes())
+}
+
+// RenderBlock renders the named block ({{define "block"}}...{{end}}) from
+// the current action's template set — the one most recently passed to
+// Render — without writing it to the response. It is the primitive
+// cache.FetchFragment builds on to cache a portion of a page.
+func (c *Context) RenderBlock(block string, data any) (template.HTML, error) {
+	if c.action == "" {
+		return "", fmt.Errorf("context: RenderBlock %q: no action rendered yet", block)
+	}
+
+	html, err := c.trail.renderer.RenderNamed(c.action, block, data)
+	if err != nil {
+		return "", fmt.Errorf("context: render block %s: %w", block, err)
+	}
+
+	return html, nil
 }

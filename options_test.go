@@ -2,8 +2,10 @@ package trails
 
 import (
 	"context"
+	"html/template"
 	"log/slog"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -65,6 +67,14 @@ func TestWithDefaultOptionsPartialOverride(t *testing.T) {
 	require.Equal(t, 3000, o.Port)
 	require.Equal(t, context.Background(), o.Context)
 	require.Same(t, slog.Default(), o.Logger)
+}
+
+func TestWithDefaultOptionsPreservesFuncMap(t *testing.T) {
+	fm := template.FuncMap{"upper": strings.ToUpper}
+
+	o := WithDefaultOptions(&TrailOptions{FuncMap: fm})
+
+	require.Equal(t, funcPointer(fm["upper"]), funcPointer(o.FuncMap["upper"]))
 }
 
 func TestWithDefaultOptionsDoesNotMutateInput(t *testing.T) {
