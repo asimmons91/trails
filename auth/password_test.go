@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/asimmons91/trails/auth"
 	"github.com/stretchr/testify/require"
@@ -80,4 +81,32 @@ func TestSecurePasswordAuthenticateFalseWithNoDigest(t *testing.T) {
 	p := &auth.SecurePassword{}
 
 	require.False(t, p.Authenticate("anything"))
+	require.False(t, p.Authenticate(""))
+}
+
+func TestSecurePasswordAuthenticateEmptyDigestRunsBcrypt(t *testing.T) {
+	empty := &auth.SecurePassword{}
+
+	real := &auth.SecurePassword{Password: "hunter2"}
+	require.NoError(t, real.BeforeInsert(context.Background()))
+
+	const iterations = 50
+
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		empty.Authenticate("wrong")
+	}
+	emptyDigestElapsed := time.Since(start)
+
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		real.Authenticate("wrong")
+	}
+	realDigestElapsed := time.Since(start)
+
+	// A pre-fix Authenticate short-circuits on an empty digest without ever
+	// calling bcrypt, so it would be orders of magnitude faster than the
+	// real-digest path. Assert it's at least in the same ballpark, so this
+	// test fails if that short-circuit ever comes back.
+	require.Greater(t, emptyDigestElapsed, realDigestElapsed/2)
 }
