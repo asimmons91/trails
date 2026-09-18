@@ -80,3 +80,16 @@ type ErrCheckViolation struct{ violation }
 func (e *ErrCheckViolation) Error() string {
 	return fmt.Sprintf("pack: %s.%s: check constraint %q violated", e.Model, e.Operation, e.Constraint)
 }
+
+// ErrSerializationFailure indicates the database aborted a statement
+// because of contention with a concurrent transaction — a deadlock, or a
+// serializable-isolation conflict — rather than any fault of the
+// statement itself. Unlike the constraint-violation errors above,
+// retrying the whole transaction from scratch is the correct, expected
+// response (the database's own error text says as much, e.g. MySQL's
+// "Deadlock found when trying to get lock; try restarting transaction").
+type ErrSerializationFailure struct{ violation }
+
+func (e *ErrSerializationFailure) Error() string {
+	return fmt.Sprintf("pack: %s.%s: aborted by the database due to a concurrent transaction conflict: %v", e.Model, e.Operation, e.err)
+}

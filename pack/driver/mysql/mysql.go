@@ -41,6 +41,10 @@ func (Driver) Classify(err error) (string, bool) {
 		return driver.CodeNotNull, true
 	case 3819: // ER_CHECK_CONSTRAINT_VIOLATED (MySQL 8.0.16+)
 		return driver.CodeCheck, true
+	case 1213: // ER_LOCK_DEADLOCK
+		return driver.CodeSerializationFailure, true
+	case 1205: // ER_LOCK_WAIT_TIMEOUT
+		return driver.CodeSerializationFailure, true
 	default:
 		return "", false
 	}

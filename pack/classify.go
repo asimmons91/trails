@@ -47,6 +47,8 @@ func classifyError(db *DB, op, model string, err error) error {
 		return &ErrNotNullViolation{base}
 	case driver.CodeCheck:
 		return &ErrCheckViolation{base}
+	case driver.CodeSerializationFailure:
+		return &ErrSerializationFailure{base}
 	default:
 		return err
 	}

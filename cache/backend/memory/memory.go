@@ -2,6 +2,8 @@ package memory
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -103,6 +105,32 @@ func (b *Backend) Exist(_ context.Context, key string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (b *Backend) Increment(_ context.Context, key string, delta int64, ttl time.Duration) (int64, time.Time, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	now := time.Now()
+	e, ok := b.entries[key]
+
+	if !ok || e.expired(now) {
+		var expiresAt time.Time
+		if ttl > 0 {
+			expiresAt = now.Add(ttl)
+		}
+		b.entries[key] = entry{value: []byte(strconv.FormatInt(delta, 10)), expiresAt: expiresAt}
+		return delta, expiresAt, nil
+	}
+
+	cur, err := strconv.ParseInt(string(e.value), 10, 64)
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("memory: increment %q: stored value is not an integer counter: %w", key, err)
+	}
+
+	next := cur + delta
+	b.entries[key] = entry{value: []byte(strconv.FormatInt(next, 10)), expiresAt: e.expiresAt}
+	return next, e.expiresAt, nil
 }
 
 func (b *Backend) Clear(_ context.Context) error {

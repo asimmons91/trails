@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -137,6 +138,78 @@ func TestCacheDatabase_ClearRemovesAllEntries(t *testing.T) {
 	n, err := pack.Of[entryRowView](db).Count(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), n)
+}
+
+func TestCacheDatabase_IncrementFreshKeyReturnsDelta(t *testing.T) {
+	db := newCacheTestDB(t)
+	b := database.New(db)
+	ctx := context.Background()
+
+	count, expiresAt, err := b.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+	require.WithinDuration(t, time.Now().Add(time.Minute), expiresAt, 5*time.Second)
+}
+
+func TestCacheDatabase_IncrementExistingKeyAddsDeltaAndKeepsOriginalExpiry(t *testing.T) {
+	db := newCacheTestDB(t)
+	b := database.New(db)
+	ctx := context.Background()
+
+	_, first, err := b.Increment(ctx, "counter", 1, time.Hour)
+	require.NoError(t, err)
+
+	count, second, err := b.Increment(ctx, "counter", 1, time.Nanosecond)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), count)
+	require.Equal(t, first, second)
+}
+
+func TestCacheDatabase_IncrementExpiredKeyResetsInsteadOfAccumulating(t *testing.T) {
+	db := newCacheTestDB(t)
+	b := database.New(db)
+	ctx := context.Background()
+
+	_, _, err := b.Increment(ctx, "counter", 1, time.Nanosecond)
+	require.NoError(t, err)
+	time.Sleep(time.Millisecond)
+
+	count, _, err := b.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCacheDatabase_IncrementZeroTTLNeverExpires(t *testing.T) {
+	db := newCacheTestDB(t)
+	b := database.New(db)
+	ctx := context.Background()
+
+	_, expiresAt, err := b.Increment(ctx, "counter", 1, 0)
+	require.NoError(t, err)
+	require.True(t, expiresAt.IsZero())
+}
+
+func TestCacheDatabase_ConcurrentIncrementIsRaceFree(t *testing.T) {
+	db := newCacheTestDB(t)
+	b := database.New(db)
+	ctx := context.Background()
+
+	const n = 50
+	var wg sync.WaitGroup
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := b.Increment(ctx, "counter", 1, time.Minute)
+			require.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	value, ok, err := b.Read(ctx, "counter")
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, "50", string(value))
 }
 
 func TestCacheDatabase_ImplementsCacheStore(t *testing.T) {

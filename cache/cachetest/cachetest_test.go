@@ -22,6 +22,23 @@ func TestCountingStoreCountsReadsAndWrites(t *testing.T) {
 	require.Equal(t, 1, store.Writes("greeting"))
 }
 
+func TestCountingStoreCountsIncrementsAndDelegatesToWrappedStore(t *testing.T) {
+	store := cachetest.New(nil)
+	ctx := context.Background()
+
+	count, _, err := store.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+
+	count, _, err = store.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), count)
+
+	require.Equal(t, 2, store.Increments("counter"))
+	require.Equal(t, 0, store.Reads("counter"))
+	require.Equal(t, 0, store.Writes("counter"))
+}
+
 func TestFetchOnlyCallsGeneratorOnceThroughCountingStore(t *testing.T) {
 	store := cachetest.New(nil)
 	ctx := context.Background()

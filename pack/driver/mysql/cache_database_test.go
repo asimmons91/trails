@@ -2,6 +2,7 @@ package mysql_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -67,4 +68,53 @@ func TestCacheDatabase_WriteReadUpsertAndSweep(t *testing.T) {
 		ok, err := b.Exist(ctx, "temp")
 		return err == nil && !ok
 	}, 3*time.Second, 20*time.Millisecond, "expired entry should be swept")
+}
+
+func TestCacheDatabase_Increment(t *testing.T) {
+	t.Parallel()
+	db := newCacheDatabaseTestDB(t)
+	ctx := context.Background()
+	b := database.New(db)
+
+	count, expiresAt, err := b.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+	require.WithinDuration(t, time.Now().Add(time.Minute), expiresAt, 5*time.Second)
+
+	// A second increment within the window adds delta and keeps the
+	// original expiry (ttl is ignored once the key already exists).
+	count, second, err := b.Increment(ctx, "counter", 1, time.Nanosecond)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), count)
+	require.Equal(t, expiresAt, second)
+
+	// An expired key resets instead of accumulating.
+	require.NoError(t, b.Write(ctx, "expired", []byte("0"), time.Nanosecond))
+	time.Sleep(time.Millisecond)
+	count, _, err = b.Increment(ctx, "expired", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+
+	// A zero TTL never expires.
+	_, zeroExpiry, err := b.Increment(ctx, "forever", 1, 0)
+	require.NoError(t, err)
+	require.True(t, zeroExpiry.IsZero())
+
+	// Concurrent increments on the same key must not lose updates.
+	const n = 50
+	var wg sync.WaitGroup
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := b.Increment(ctx, "concurrent", 1, time.Minute)
+			require.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	value, ok, err := b.Read(ctx, "concurrent")
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, "50", string(value))
 }

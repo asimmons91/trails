@@ -41,6 +41,10 @@ func (Driver) Classify(err error) (string, bool) {
 		return driver.CodeNotNull, true
 	case "23514":
 		return driver.CodeCheck, true
+	case "40001": // serialization_failure
+		return driver.CodeSerializationFailure, true
+	case "40P01": // deadlock_detected
+		return driver.CodeSerializationFailure, true
 	default:
 		return "", false
 	}

@@ -17,9 +17,10 @@ type tHelper interface {
 type CountingStore struct {
 	store cache.Store
 
-	mu     sync.Mutex
-	reads  map[string]int
-	writes map[string]int
+	mu         sync.Mutex
+	reads      map[string]int
+	writes     map[string]int
+	increments map[string]int
 }
 
 var _ cache.Store = (*CountingStore)(nil)
@@ -29,9 +30,10 @@ func New(store cache.Store) *CountingStore {
 		store = memory.New()
 	}
 	return &CountingStore{
-		store:  store,
-		reads:  make(map[string]int),
-		writes: make(map[string]int),
+		store:      store,
+		reads:      make(map[string]int),
+		writes:     make(map[string]int),
+		increments: make(map[string]int),
 	}
 }
 
@@ -47,6 +49,13 @@ func (c *CountingStore) Write(ctx context.Context, key string, value []byte, ttl
 	c.writes[key]++
 	c.mu.Unlock()
 	return c.store.Write(ctx, key, value, ttl)
+}
+
+func (c *CountingStore) Increment(ctx context.Context, key string, delta int64, ttl time.Duration) (int64, time.Time, error) {
+	c.mu.Lock()
+	c.increments[key]++
+	c.mu.Unlock()
+	return c.store.Increment(ctx, key, delta, ttl)
 }
 
 func (c *CountingStore) Delete(ctx context.Context, key string) error {
@@ -72,6 +81,13 @@ func (c *CountingStore) Writes(key string) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.writes[key]
+}
+
+// Increments returns how many times key has been incremented.
+func (c *CountingStore) Increments(key string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.increments[key]
 }
 
 func AssertCached(t assert.TestingT, ctx context.Context, store cache.Store, key string) bool {
