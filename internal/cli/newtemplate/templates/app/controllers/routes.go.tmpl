@@ -9,6 +9,7 @@ import (
 	"github.com/asimmons91/trails/csrf"
 	"github.com/asimmons91/trails/jobs"
 	"github.com/asimmons91/trails/pack"
+	"github.com/asimmons91/trails/secureheaders"
 	"github.com/asimmons91/trails/session"
 )
 
@@ -26,12 +27,29 @@ func Routes(db *pack.DB, jobsBackend jobs.Backend, cacheStore cache.Store, cache
 		r.Static("/assets/", assetsFS)
 		r.Static("/static/", staticFS)
 
-		// session must come before csrf: csrf.Middleware reads the current
-		// session's token via session.FromContext and panics if none is
-		// present on the Context. Both apply to every route registered
-		// below (Static above is unaffected — it bypasses middleware
-		// entirely).
-		r.Use(session.Middleware(secretKeyBase), csrf.Middleware())
+		// secureheaders sets HSTS/nosniff/frame-options/referrer-policy on
+		// every response with framework defaults; it has no dependency on
+		// session/csrf, so it's registered first. session must come before
+		// csrf: csrf.Middleware reads the current session's token via
+		// session.FromContext and panics if none is present on the
+		// Context. All three apply to every route registered below
+		// (Static above is unaffected — it bypasses middleware entirely).
+		r.Use(secureheaders.Middleware(), session.Middleware(secretKeyBase), csrf.Middleware())
+
+		// CORS is off by default (no allowed origins configured) — most
+		// server-rendered trails apps have no separate cross-origin
+		// frontend to allow. If you're serving a separate SPA/mobile
+		// client, scope cors.Middleware to that API's own group/prefix and
+		// register a matching OPTIONS route so preflight requests reach
+		// it — trails registers routes against Go's http.ServeMux with
+		// per-method patterns, so an OPTIONS request against a path with
+		// no OPTIONS route never reaches any middleware at all. See the
+		// cors package doc comment for the full explanation, including why
+		// an OPTIONS route must not be registered at the router root in an
+		// app using Router.Static (as this one does, above):
+		//
+		// api := r.NewGroup("/api", cors.Middleware(cors.WithAllowedOrigins("https://app.example.com")))
+		// api.HandleFunc(http.MethodOptions, "/{path...}", cors.PreflightHandler)
 
 		examples := NewExamplesController(db)
 
