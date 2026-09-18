@@ -42,10 +42,21 @@ func newTestTrail(t *testing.T, opts *TrailOptions) *Trail {
 }
 
 func TestNewWiresOptionsIntoTrail(t *testing.T) {
-	trail := newTestTrail(t, &TrailOptions{Host: "0.0.0.0", Port: 8080})
+	trail := newTestTrail(t, &TrailOptions{
+		Host:              "0.0.0.0",
+		Port:              8080,
+		ReadHeaderTimeout: 1 * time.Second,
+		ReadTimeout:       2 * time.Second,
+		WriteTimeout:      3 * time.Second,
+		IdleTimeout:       4 * time.Second,
+	})
 
 	require.Equal(t, "0.0.0.0", trail.Host)
 	require.Equal(t, 8080, trail.Port)
+	require.Equal(t, 1*time.Second, trail.readHeaderTimeout)
+	require.Equal(t, 2*time.Second, trail.readTimeout)
+	require.Equal(t, 3*time.Second, trail.writeTimeout)
+	require.Equal(t, 4*time.Second, trail.idleTimeout)
 
 	c := trail.contextPool.Get().(*Context)
 	require.Same(t, trail.logger, c.Logger())
@@ -333,6 +344,46 @@ func TestRunReturnsShutdownError(t *testing.T) {
 	}
 
 	close(release)
+}
+
+func TestRunClosesConnectionsThatStallOnHeaders(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := listener.Addr().(*net.TCPAddr)
+	require.NoError(t, listener.Close())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	trail := newTestTrail(t, &TrailOptions{
+		Host:              "127.0.0.1",
+		Port:              addr.Port,
+		Context:           ctx,
+		ReadHeaderTimeout: 100 * time.Millisecond,
+	})
+
+	go func() { _ = trail.Run() }()
+
+	deadline := time.Now().Add(2 * time.Second)
+	var conn net.Conn
+	for {
+		conn, err = net.Dial("tcp", addr.String())
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server did not start listening in time: %v", err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	defer conn.Close()
+
+	// Deliberately send nothing — a client stalled mid-headers. Without
+	// ReadHeaderTimeout, the server would hold this connection open
+	// indefinitely (the Slowloris exposure this fix closes).
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(1*time.Second)))
+	buf := make([]byte, 1)
+	_, readErr := conn.Read(buf)
+	require.Error(t, readErr, "expected the server to close the stalled connection")
 }
 
 func TestRunShutsDownGracefullyOnContextCancel(t *testing.T) {

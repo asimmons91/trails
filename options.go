@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io/fs"
 	"log/slog"
+	"time"
 )
 
 type AssetsStrategy string
@@ -44,6 +45,17 @@ type TrailOptions struct {
 	// that render only. Leave nil to skip the extra per-render template
 	// clone entirely — see csrf.RequestFuncMap for the built-in use case.
 	RequestFuncMap func(c *Context) template.FuncMap
+
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	// WriteTimeout caps how long a response may take to write. It defaults
+	// to 0 (no limit) because channels/sse.go holds connections open to
+	// stream Server-Sent Events for as long as a client stays connected —
+	// Go's WriteTimeout doesn't reset while a handler is actively writing,
+	// so any fixed default here would silently kill long-lived SSE streams.
+	// Set it explicitly if your app doesn't serve long-lived responses.
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
 }
 
 func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
@@ -63,6 +75,11 @@ func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
 		AssetsStrategy: opts.AssetsStrategy,
 		Runners:        opts.Runners,
 		RequestFuncMap: opts.RequestFuncMap,
+
+		ReadHeaderTimeout: opts.ReadHeaderTimeout,
+		ReadTimeout:       opts.ReadTimeout,
+		WriteTimeout:      opts.WriteTimeout,
+		IdleTimeout:       opts.IdleTimeout,
 	}
 
 	if o.Context == nil {
@@ -99,6 +116,18 @@ func WithDefaultOptions(opts *TrailOptions) *TrailOptions {
 
 	if o.AssetsStrategy == "" {
 		o.AssetsStrategy = AssetsStrategyImportMap
+	}
+
+	if o.ReadHeaderTimeout == 0 {
+		o.ReadHeaderTimeout = 5 * time.Second
+	}
+
+	if o.ReadTimeout == 0 {
+		o.ReadTimeout = 30 * time.Second
+	}
+
+	if o.IdleTimeout == 0 {
+		o.IdleTimeout = 120 * time.Second
 	}
 
 	return o
