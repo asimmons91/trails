@@ -35,6 +35,11 @@ type Trail struct {
 	logger       *slog.Logger
 	runners      []Runner
 
+	readHeaderTimeout time.Duration
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
+
 	Host string
 	Port int
 }
@@ -47,8 +52,14 @@ func New(o *TrailOptions) (*Trail, error) {
 		routeBuilder: o.RouteBuilder,
 		binder:       o.Binder,
 		runners:      o.Runners,
-		Host:         o.Host,
-		Port:         o.Port,
+
+		readHeaderTimeout: o.ReadHeaderTimeout,
+		readTimeout:       o.ReadTimeout,
+		writeTimeout:      o.WriteTimeout,
+		idleTimeout:       o.IdleTimeout,
+
+		Host: o.Host,
+		Port: o.Port,
 	}
 	t.setupPool()
 	t.setupRouter()
@@ -129,8 +140,12 @@ func (t *Trail) Use(mws ...MiddlewareFunc) {
 func (t *Trail) Run() error {
 	addr := fmt.Sprintf("%s:%d", t.Host, t.Port)
 	server := &http.Server{
-		Addr:    addr,
-		Handler: t,
+		Addr:              addr,
+		Handler:           t,
+		ReadHeaderTimeout: t.readHeaderTimeout,
+		ReadTimeout:       t.readTimeout,
+		WriteTimeout:      t.writeTimeout,
+		IdleTimeout:       t.idleTimeout,
 	}
 
 	ctx, stop := signal.NotifyContext(t.context, os.Interrupt, syscall.SIGTERM)

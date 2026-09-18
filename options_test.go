@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +26,26 @@ func TestWithDefaultOptionsFillsAllDefaults(t *testing.T) {
 	require.Equal(t, 3000, o.Port)
 	require.IsType(t, &DefaultBinder{}, o.Binder)
 	require.Equal(t, AssetsStrategyImportMap, o.AssetsStrategy)
+	require.Equal(t, 5*time.Second, o.ReadHeaderTimeout)
+	require.Equal(t, 30*time.Second, o.ReadTimeout)
+	require.Equal(t, time.Duration(0), o.WriteTimeout)
+	require.Equal(t, 120*time.Second, o.IdleTimeout)
+}
+
+func TestWithDefaultOptionsPreservesExplicitTimeouts(t *testing.T) {
+	input := &TrailOptions{
+		ReadHeaderTimeout: 1 * time.Second,
+		ReadTimeout:       2 * time.Second,
+		WriteTimeout:      3 * time.Second,
+		IdleTimeout:       4 * time.Second,
+	}
+
+	o := WithDefaultOptions(input)
+
+	require.Equal(t, 1*time.Second, o.ReadHeaderTimeout)
+	require.Equal(t, 2*time.Second, o.ReadTimeout)
+	require.Equal(t, 3*time.Second, o.WriteTimeout)
+	require.Equal(t, 4*time.Second, o.IdleTimeout)
 }
 
 func TestWithDefaultOptionsPreservesExplicitAssetsStrategy(t *testing.T) {
