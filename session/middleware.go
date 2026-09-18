@@ -60,7 +60,7 @@ func WithSecure(secure bool) Option {
 
 // WithMaxAge sets the session cookie's Max-Age. The default, zero, omits
 // Max-Age entirely, producing a browser-session cookie that's cleared when
-// the browser closes (matching Rails' default).
+// the browser closes.
 func WithMaxAge(d time.Duration) Option {
 	return func(c *config) { c.maxAge = d }
 }
@@ -81,7 +81,7 @@ func FromContext(c *trails.Context) *Session {
 	return c.Get[*Session](ctxKey)
 }
 
-// Middleware returns Rails-classic cookie-store session middleware: the
+// Middleware returns cookie-store session middleware: the
 // entire session is JSON-serialized and AES-256-GCM encrypted directly into
 // a single cookie on write, with no server-side storage. secretKeyBase
 // should be a long random secret (see trails.LoadCredentials and the

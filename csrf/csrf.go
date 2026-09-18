@@ -1,8 +1,12 @@
 // Package csrf provides synchronizer-token CSRF protection for trails,
 // tied to a session's per-session token (see the session package). Register
-// it after session.Middleware:
+// Middleware after session.Middleware, and wire PlaceholderFuncMap and
+// RequestFuncMap into TrailOptions so views can render the token:
 //
 //	t.Use(session.Middleware(secretKeyBase), csrf.Middleware())
+//
+//	opts.FuncMap = csrf.PlaceholderFuncMap
+//	opts.RequestFuncMap = csrf.RequestFuncMap
 package csrf
 
 import (
@@ -60,10 +64,8 @@ var safeMethods = map[string]bool{
 // Middleware verifies a synchronizer CSRF token on every unsafe-method
 // request (anything but GET/HEAD/OPTIONS/TRACE) against the current
 // session's token. It must be registered after session.Middleware in the
-// chain; if no Session is found on the Context, it panics — that's always a
-// wiring mistake, never something a request can trigger, and is far easier
-// to notice loudly on the very first request than as a silent bypass of
-// CSRF protection.
+// chain; it panics if no Session is found on the Context, since that's a
+// wiring bug rather than something a request can trigger.
 func Middleware(opts ...Option) trails.MiddlewareFunc {
 	cfg := newConfig(opts)
 
@@ -145,22 +147,30 @@ var PlaceholderFuncMap = template.FuncMap{
 }
 
 // RequestFuncMap returns the real, per-request csrfField/csrfMetaTag
-// implementations for c's session. Pass directly as
-// trails.TrailOptions.RequestFuncMap; requires session.Middleware and
-// Middleware to already be wired in.
+// implementations for c's session, using the default field/header names.
+// Pass directly as trails.TrailOptions.RequestFuncMap; requires
+// session.Middleware and Middleware to already be wired in. If Middleware
+// is configured with WithFieldName/WithHeaderName, use
+// NewRequestFuncMap(sameOpts...) instead so the names match.
 //
 // csrfField renders a hidden <input> suitable for placing inside a <form>.
 // csrfMetaTag renders the csrf-param/csrf-token <meta> tags JS can read to
-// send the header Middleware checks. Both use the default field/header
-// names (WithFieldName/WithHeaderName do not affect them) — if you override
-// those on Middleware, build a matching FuncMap with requestFuncMap instead.
+// send the header Middleware checks.
 //
 // Do not call these from a template rendered via Context.RenderBlock —
 // fragments rendered that way can be cached across requests/users (see
 // cache.FetchFragment), and a per-session token must never end up in a
 // fragment cached for someone else.
 func RequestFuncMap(c *trails.Context) template.FuncMap {
-	return requestFuncMap(&config{fieldName: defaultFieldName, headerName: defaultHeaderName})(c)
+	return NewRequestFuncMap()(c)
+}
+
+// NewRequestFuncMap builds a RequestFuncMap-style function using opts,
+// matching Middleware(opts...) when it's configured with WithFieldName
+// and/or WithHeaderName. See RequestFuncMap for what csrfField/csrfMetaTag
+// do and when not to call them.
+func NewRequestFuncMap(opts ...Option) func(*trails.Context) template.FuncMap {
+	return requestFuncMap(newConfig(opts))
 }
 
 func requestFuncMap(cfg *config) func(c *trails.Context) template.FuncMap {

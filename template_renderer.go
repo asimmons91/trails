@@ -10,7 +10,14 @@ import (
 	"strings"
 )
 
+// Renderer renders views. The only implementation is trails' own
+// html/template-based one, built internally from ViewFS/LayoutName;
+// there is currently no supported way to substitute a different one.
 type Renderer interface {
+	// Render renders name (the "controller/action" template set) into w,
+	// executing the configured layout around it. c is used only when a
+	// RequestFuncMap is configured, to build that request's extra
+	// template functions.
 	Render(c *Context, w io.Writer, name string, data any) error
 
 	// RenderNamed renders the named block ({{define "block"}}...{{end}})

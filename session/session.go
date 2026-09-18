@@ -1,4 +1,4 @@
-// Package session provides Rails-classic cookie-store sessions for trails:
+// Package session provides cookie-store sessions for trails:
 // the entire session is serialized and encrypted directly into a single
 // cookie, with no server-side storage. See Middleware.
 package session

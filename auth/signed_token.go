@@ -68,9 +68,9 @@ func GenerateTokenFor(secretKeyBase, purpose, id, digest string, expiresIn time.
 
 // VerifyTokenFor verifies a token produced by GenerateTokenFor for purpose,
 // checking it decrypts, has not expired, and was minted with the same
-// digest. It returns the token's id and true only if every check passes —
-// like Rails' find_by_token_for, no distinction is made between an
-// expired, tampered, wrong-purpose, or digest-mismatched token, so a
+// digest. It returns the token's id and true only if every check passes
+// no distinction is made between an expired, tampered,
+// wrong-purpose, or digest-mismatched token, so a
 // caller can't use timing or error content to probe which one it was.
 func VerifyTokenFor(secretKeyBase, purpose, token, digest string) (id string, ok bool) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)

@@ -40,6 +40,22 @@ var refPatterns = map[string]refPattern{
 	},
 }
 
+// Compile fingerprints every .css/.js/.map file under sourceDir and
+// writes the result to outputDir, returning the resulting Manifest (also
+// written as outputDir/manifest.json).
+//
+// outputDir is removed and recreated first, so anything already there
+// that Compile didn't just write is lost — point it only at a directory
+// dedicated to compiled output.
+//
+// Each file's digest is a hash of its own content plus the content of
+// every local file it references (transitively, with cycle protection),
+// via a CSS "@import url(...)" or a JS "//# sourceMappingURL=..."
+// comment — so changing a dependency changes every dependent's digest
+// too. Local references are rewritten in the output to their
+// prefix-joined digested paths; external references (http://, https://,
+// //, data:) are left untouched. A local reference that doesn't resolve
+// to a known file is an error.
 func Compile(sourceDir, outputDir, prefix string) (Manifest, error) {
 	if err := os.RemoveAll(outputDir); err != nil {
 		return nil, fmt.Errorf("assets: cleaning output dir: %w", err)

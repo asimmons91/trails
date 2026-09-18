@@ -11,6 +11,12 @@ import (
 	"github.com/asimmons91/trails/pack"
 )
 
+// Run polls for available rows every WithPollInterval, dispatching up to
+// WithWorkers of them concurrently through the Registry, and periodically
+// deletes rows past WithRetention. It's what actually processes jobs
+// persisted by Enqueue — nothing runs until Run is started. It blocks until
+// ctx is canceled, waits for in-flight dispatches to finish, then returns
+// nil. Satisfies trails.Runner.
 func (b *Backend) Run(ctx context.Context) error {
 	pollTicker := time.NewTicker(b.pollInterval)
 	defer pollTicker.Stop()

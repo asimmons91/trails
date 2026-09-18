@@ -1,6 +1,5 @@
 // Package trustedproxy resolves the real client IP and request scheme
-// (http/https) from X-Forwarded-For/X-Forwarded-Proto — trails' equivalent
-// of Rails' ActionDispatch::RemoteIp / Django's SECURE_PROXY_SSL_HEADER —
+// (http/https) from X-Forwarded-For/X-Forwarded-Proto
 // but only trusts those headers when the immediate TCP peer (r.RemoteAddr)
 // is itself a configured trusted proxy. An untrusted peer's X-Forwarded-*
 // headers are never consulted, since any client can send them.
@@ -21,7 +20,7 @@
 // If your proxy terminates TLS but forwards to the app over plain HTTP
 // without setting X-Forwarded-Proto (or any equivalent) at all, there's
 // nothing for WithTrustedProxies to verify for scheme purposes — use
-// WithAssumeSSL instead, trails' equivalent of Rails' config.assume_ssl:
+// WithAssumeSSL instead:
 //
 //	t.Use(trustedproxy.Middleware(trustedproxy.WithTrustedProxies(trustedproxy.PrivateCIDRs...), trustedproxy.WithAssumeSSL(true)), ...)
 //
@@ -54,8 +53,7 @@ type config struct {
 type Option func(*config)
 
 // PrivateCIDRs is a convenience list of RFC 1918 / RFC 4193 / loopback
-// private-range CIDRs (matching Rails' RemoteIp default trusted_proxies
-// list), for apps that terminate TLS at a reverse proxy on the same private
+// private-range CIDRs, for apps that terminate TLS at a reverse proxy on the same private
 // network:
 //
 //	trustedproxy.Middleware(trustedproxy.WithTrustedProxies(trustedproxy.PrivateCIDRs...))
@@ -101,8 +99,8 @@ func WithTrustedProxies(cidrs ...string) Option {
 }
 
 // WithAssumeSSL forces Scheme/IsSecure to always report "https", ignoring
-// both r.TLS and any X-Forwarded-Proto header — trails' equivalent of
-// Rails' config.assume_ssl. Use this when a proxy terminates TLS but
+// both r.TLS and any X-Forwarded-Proto header.
+// Use this when a proxy terminates TLS but
 // forwards to the app over plain HTTP without setting any header
 // indicating so, meaning there is nothing for WithTrustedProxies to
 // verify: WithTrustedProxies still applies to X-Forwarded-For/ClientIP

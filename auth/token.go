@@ -6,8 +6,7 @@ import (
 	"fmt"
 )
 
-// tokenBytes matches Rails' has_secure_token default length (24 random
-// bytes) for comparable collision resistance.
+// tokenBytes is default 24 random bytes to ensure collision resistance.
 const tokenBytes = 24
 
 // NewToken returns a random, URL-safe opaque token suitable for

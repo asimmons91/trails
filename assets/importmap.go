@@ -18,25 +18,48 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// Pin is a single entry in an ImportMap's [[pin]] list, trails'
+// equivalent of an importmap-rails pin. Name is the import specifier
+// scripts will use (import "name"). If To is empty, Name resolves
+// against the manifest as "<Name>.js" (an own-app asset built by
+// Compile). If To is an absolute/external URL (http://, https://, //,
+// data:), it's used as-is. Otherwise To is a local vendor filename and
+// resolves against the manifest as "vendor/<To>" — not as a literal path
+// — matching where the `importmap pin` CLI command downloads vendored
+// packages.
 type Pin struct {
 	Name    string `toml:"name"`
 	To      string `toml:"to,omitempty"`
 	Preload bool   `toml:"preload"`
 }
 
+// PinAll is a [[pin_all]] entry that pins every matching file under a
+// directory at once, trails' equivalent of importmap-rails' pin_all.
 type PinAll struct {
-	Dir     string `toml:"dir"`
-	Under   string `toml:"under"`
-	Preload bool   `toml:"preload"`
-	Pattern string `toml:"pattern,omitempty"`
+	// Dir is the manifest-relative directory to scan.
+	Dir string
+	// Under prefixes the resulting pin names: a matched file at
+	// Dir/sub/foo.js is pinned as "Under/sub/foo".
+	Under   string
+	Preload bool
+	// Pattern is a path.Match glob evaluated relative to Dir. Empty
+	// defaults to "**/*.js". A "**/" prefix matches at any depth (the
+	// glob is matched against the basename only); without it, the
+	// pattern matches only the path directly under Dir (so "*.js" won't
+	// match "sub/foo.js", but "sub/*.js" will).
+	Pattern string
 }
 
+// ResolvedEntry is one entry of an import map, ready to render:
+// Name -> URL, with Preload marking it for a modulepreload link.
 type ResolvedEntry struct {
 	Name    string
 	URL     string
 	Preload bool
 }
 
+// ImportMap is a parsed importmap.toml: a list of individual Pins plus
+// PinAlls for pinning whole directories
 type ImportMap struct {
 	Pins    []Pin    `toml:"pin"`
 	PinAlls []PinAll `toml:"pin_all"`
@@ -121,6 +144,7 @@ func (pa *PinAll) resolve(m Manifest, prefix string) ([]ResolvedEntry, error) {
 	return entries, nil
 }
 
+// Save writes i as TOML to path, overwriting any existing file.
 func (i *ImportMap) Save(path string) error {
 	data, err := toml.Marshal(*i)
 	if err != nil {
@@ -133,6 +157,9 @@ func (i *ImportMap) Save(path string) error {
 	return nil
 }
 
+// AddPin adds p, or replaces the existing pin with the same Name in
+// place (preserving its position — pin order affects the order
+// RenderImportMapTag emits modulepreload links in).
 func (i *ImportMap) AddPin(p Pin) {
 	for idx, existing := range i.Pins {
 		if existing.Name == p.Name {
@@ -144,6 +171,7 @@ func (i *ImportMap) AddPin(p Pin) {
 	i.Pins = append(i.Pins, p)
 }
 
+// RemovePin removes the pin named name, reporting whether one was found.
 func (i *ImportMap) RemovePin(name string) (Pin, bool) {
 	for idx, existing := range i.Pins {
 		if existing.Name == name {
@@ -155,6 +183,10 @@ func (i *ImportMap) RemovePin(name string) (Pin, bool) {
 	return Pin{}, false
 }
 
+// Resolve resolves every Pin, then every PinAll, against m and prefix,
+// returning all entries in that order. The first resolution error, from
+// either a Pin or a PinAll, short-circuits and returns no partial
+// results.
 func (i *ImportMap) Resolve(m Manifest, prefix string) ([]ResolvedEntry, error) {
 	entries := make([]ResolvedEntry, 0, len(i.Pins))
 
@@ -177,6 +209,8 @@ func (i *ImportMap) Resolve(m Manifest, prefix string) ([]ResolvedEntry, error) 
 	return entries, nil
 }
 
+// LoadImportMapConfig reads and parses the importmap.toml at path within
+// fsys.
 func LoadImportMapConfig(fsys fs.FS, path string) (*ImportMap, error) {
 	data, err := fs.ReadFile(fsys, path)
 	if err != nil {
@@ -191,6 +225,12 @@ func LoadImportMapConfig(fsys fs.FS, path string) (*ImportMap, error) {
 	return &im, nil
 }
 
+// RenderImportMapTag renders entries as a <script type="importmap"> tag
+// (Name -> URL; any "</" in the JSON is escaped to "<\/" so a URL can't
+// break out of the tag), followed by one <link rel="modulepreload"> per
+// entry with Preload set, in entries' order. If any entry is named
+// "application", a trailing <script type="module">import
+// "application"</script> bootstrap tag is appended.
 func RenderImportMapTag(entries []ResolvedEntry) (template.HTML, error) {
 	imports := make(map[string]string, len(entries))
 	for _, e := range entries {
@@ -230,6 +270,8 @@ type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// JspmResolver resolves package specifiers to CDN URLs via jspm.io's
+// generate API. The zero value is ready to use.
 type JspmResolver struct {
 	httpClient httpDoer
 }
@@ -255,6 +297,11 @@ func (j *JspmResolver) client() httpDoer {
 	return http.DefaultClient
 }
 
+// Generate resolves pkg (and its transitive dependencies) against
+// https://api.jspm.io/generate for a browser/module/production
+// environment, returning specifier -> CDN URL for pkg and every
+// dependency it pulled in. It always calls the live jspm.io API; there is
+// no way to point it elsewhere from outside this package.
 func (j *JspmResolver) Generate(pkg string) (map[string]string, error) {
 	reqBody, err := json.Marshal(jspmGenerateRequest{
 		Install:      []string{pkg},
@@ -300,6 +347,9 @@ func (j *JspmResolver) Generate(pkg string) (map[string]string, error) {
 	return out.Map.Imports, nil
 }
 
+// Download fetches url and returns its body, erroring on any non-200
+// response. It uses http.DefaultClient with no timeout — a slow or
+// unresponsive server can block indefinitely.
 func Download(url string) ([]byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -321,10 +371,21 @@ func Download(url string) ([]byte, error) {
 
 var sourceMappingURLLine = regexp.MustCompile(`(?m)^[ \t]*//#\s*sourceMappingURL=\S+[ \t]*\n?`)
 
+// StripSourceMappingURL removes a trailing "//# sourceMappingURL=..."
+// line from data (as jspm/CDN-served files often have, pointing at a map
+// file that isn't vendored alongside them). It only strips lines that
+// consist solely of the comment (optionally preceded by whitespace); a
+// sourceMappingURL comment following code on the same line is left in
+// place.
 func StripSourceMappingURL(data []byte) []byte {
 	return sourceMappingURLLine.ReplaceAll(data, nil)
 }
 
+// VendorFilename derives a local filename for a vendored package: "@" is
+// dropped and "/" becomes "-" in specifier (so "@scope/name@2" becomes
+// "scope-name2", not "scope-name@2" — a version suffix collapses into the
+// name without a separator), with url's own extension appended if it has
+// one, defaulting to ".js".
 func VendorFilename(specifier, url string) string {
 	ext := ".js"
 	if u, err := neturl.Parse(url); err == nil {

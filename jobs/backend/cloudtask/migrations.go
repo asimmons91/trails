@@ -6,6 +6,10 @@ import (
 	"github.com/asimmons91/trails/pack/migrate"
 )
 
+// Migration creates the cloudtask_jobs, cloudtask_concurrency_slots, and
+// cloudtask_schedule tables and their indexes. Apply it (e.g. via
+// pack/migrate) against the app's database before constructing a Backend
+// against it.
 var Migration = migrate.Migration{
 	ID: "20260915000000_create_cloudtask_tables",
 

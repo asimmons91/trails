@@ -9,9 +9,16 @@ import (
 
 var _ trails.Spur = (*Backend)(nil)
 
-func (b *Backend) ViewFS() fs.FS   { return nil }
+// ViewFS returns nil: Backend has no views of its own.
+func (b *Backend) ViewFS() fs.FS { return nil }
+
+// AssetsFS returns nil: Backend has no assets of its own.
 func (b *Backend) AssetsFS() fs.FS { return nil }
 
+// Routes mounts the two handlers Cloud Tasks pushes back into: job
+// execution (default "/tasks/run", see WithPushPath) and the
+// self-rescheduling cleanup chain (default "/tasks/cleanup", see
+// WithCleanupPath).
 func (b *Backend) Routes(g *trails.Group) {
 	g.Post(b.pushPath, b.handlePush)
 	g.Post(b.cleanupPath, b.handleCleanupPush)

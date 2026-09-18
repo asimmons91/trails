@@ -1,14 +1,10 @@
 // Package ratelimit throttles requests per client using a cache.Store-backed
-// counter — trails' equivalent of Rails 7.2's
-// ActionController::RateLimiting#rate_limit (Django has no first-party
-// equivalent either; django-ratelimit is a third-party add-on) —
-// implemented as ordinary trails middleware rather than a controller-level
-// DSL. Each request increments a fixed-window counter keyed by HTTP method
+// counter implemented as ordinary trails middleware.
+// Each request increments a fixed-window counter keyed by HTTP method
 // + path + a per-client identity (see WithKeyFunc); once the configured
 // limit is exceeded within the configured period, the request is rejected
 // with 429 Too Many Requests and a Retry-After header (or, if
-// WithOnLimited is set, whatever response that callback produces instead —
-// trails' answer to Rails' rate_limit(with:)).
+// WithOnLimited is set, whatever response that callback produces instead).
 //
 // The counter's atomicity comes entirely from cache.Store.Increment, so any
 // Store works: cache/backend/memory for a single process, or
@@ -52,7 +48,7 @@ const defaultPeriod = time.Minute
 type KeyFunc func(c *trails.Context) string
 
 // OnLimitedFunc fully replaces the built-in 429 response when a client has
-// exceeded its limit — trails' equivalent of Rails' rate_limit(with:).
+// exceeded its.
 // retryAfter is how long remains in the current window.
 type OnLimitedFunc func(c *trails.Context, retryAfter time.Duration) error
 
@@ -91,8 +87,8 @@ func WithName(name string) Option {
 }
 
 // WithOnLimited fully replaces the built-in 429 + Retry-After response
-// with fn when a client exceeds its limit — trails' equivalent of Rails'
-// rate_limit(with:). The default (no WithOnLimited) sets a Retry-After
+// with fn when a client exceeds its limit.
+// The default (no WithOnLimited) sets a Retry-After
 // header and returns a 429 HTTPError.
 func WithOnLimited(fn OnLimitedFunc) Option {
 	return func(c *config) { c.onLimited = fn }

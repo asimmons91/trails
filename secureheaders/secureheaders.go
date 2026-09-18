@@ -1,6 +1,5 @@
-// Package secureheaders sets static, response-wide security headers —
-// trails' equivalent of Django's SecurityMiddleware or Rails'
-// ActionDispatch::SSL and CSP DSL. Register it with Router.Use/Trail.Use;
+// Package secureheaders sets static, response-wide security headers
+// Register it with Router.Use/Trail.Use;
 // it applies to every response and has no dependency on session or csrf, so
 // registering it outermost (first in the middleware list) ensures the
 // headers land even on error responses:
@@ -26,7 +25,7 @@ const (
 	FrameOptionsSameOrigin FrameOptions = "SAMEORIGIN"
 )
 
-// defaultHSTSMaxAge is two years, matching Rails' force_ssl default.
+// defaultHSTSMaxAge is two years.
 const defaultHSTSMaxAge = 2 * 365 * 24 * time.Hour
 
 const defaultReferrerPolicy = "strict-origin-when-cross-origin"

@@ -53,9 +53,9 @@ func Boot() error {
 		return err
 	}
 
-	// The memory cache backend needs a background sweep loop to evict
-	// expired entries; other backends (file, redis, ...) won't implement
-	// trails.Runner and are simply skipped here.
+	// The configured cache backend may implement trails.Runner (memory and
+	// database both do, to run their background sweep loop); one that
+	// doesn't is simply skipped here.
 	var runners []trails.Runner
 	if runner, ok := any(cacheStore).(trails.Runner); ok {
 		runners = append(runners, runner)

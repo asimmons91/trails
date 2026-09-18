@@ -33,20 +33,30 @@ var (
 	_ trails.Runner = (*Backend)(nil)
 )
 
+// Option configures New.
 type Option func(*Backend)
 
+// WithSweepInterval sets how often Run sweeps expired entries. The
+// default is one minute.
 func WithSweepInterval(d time.Duration) Option {
 	return func(b *Backend) { b.sweepInterval = d }
 }
 
+// WithSweepBatchSize sets how many expired rows Run deletes per batch.
+// The default is 500.
 func WithSweepBatchSize(n int) Option {
 	return func(b *Backend) { b.sweepBatchSize = n }
 }
 
+// WithLogger sets the logger used to report background failures (a
+// failed sweep, or a failed best-effort eviction on read). The default is
+// slog.Default().
 func WithLogger(l *slog.Logger) Option {
 	return func(b *Backend) { b.logger = l }
 }
 
+// Backend is a cache.Store backed by a SQL table via pack. Construct one
+// with New.
 type Backend struct {
 	db *pack.DB
 
@@ -55,6 +65,8 @@ type Backend struct {
 	logger         *slog.Logger
 }
 
+// New returns a ready-to-use Backend backed by db. Register Migration
+// before first use (see Migration's doc comment).
 func New(db *pack.DB, opts ...Option) *Backend {
 	b := &Backend{
 		db:             db,
@@ -70,6 +82,9 @@ func New(db *pack.DB, opts ...Option) *Backend {
 	return b
 }
 
+// Read returns the value stored at key, and false if key is absent or has
+// expired. An expired row is evicted, best-effort, as a side effect of
+// this call.
 func (b *Backend) Read(ctx context.Context, key string) ([]byte, bool, error) {
 	row, ok, err := b.lookup(ctx, key)
 	if err != nil || !ok {
@@ -78,6 +93,9 @@ func (b *Backend) Read(ctx context.Context, key string) ([]byte, bool, error) {
 	return row.Value, true, nil
 }
 
+// Write upserts value at key (atomic per-row on every dialect via ON
+// CONFLICT / ON DUPLICATE KEY UPDATE), expiring after ttl (ttl <= 0 means
+// never).
 func (b *Backend) Write(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	now := time.Now()
 
@@ -113,20 +131,14 @@ func incrementRetryBackoff(attempt int) time.Duration {
 	return time.Duration(1+rand.IntN(4)) * time.Millisecond * time.Duration(attempt)
 }
 
-// Increment atomically adds delta to the integer counter stored at key,
-// reusing entryRow/entryCol as-is (no schema change). This intentionally
-// does not do the arithmetic in SQL: Value is a []byte (BYTEA/BLOB) column,
-// and doing "value = value + delta" against that column's storage requires
-// brittle, dialect-specific CAST idioms to get in and back out of blob
-// storage — doing the arithmetic in Go against an already-locked row avoids
-// that entirely.
-//
-// Every caller locking the same key's row is exactly the kind of hot-row
-// contention that can trip a database's deadlock detector, or two callers
-// racing to create the same brand-new key — both observed in practice
-// under MySQL/InnoDB when many transactions target the same key
-// concurrently, even though there is only ever one row involved — so this
-// retries a bounded number of times with jittered backoff before giving up.
+// Increment implements cache.Store's Increment contract by locking key's
+// row and doing the arithmetic in Go rather than in SQL — Value is a
+// BYTEA/BLOB column, and "value = value + delta" against blob storage
+// needs brittle, dialect-specific casts. Concurrent callers incrementing
+// the same key contend for that row, which under load can trip a
+// deadlock/lock-timeout error (MySQL/InnoDB) or race to create the same
+// new key (ErrUniqueViolation); Increment retries either, bounded, with
+// jittered backoff.
 func (b *Backend) Increment(ctx context.Context, key string, delta int64, ttl time.Duration) (int64, time.Time, error) {
 	var (
 		count     int64
@@ -232,16 +244,20 @@ func (b *Backend) incrementOnce(ctx context.Context, key string, delta int64, tt
 	return result, expiresAt, nil
 }
 
+// Delete removes key. It is not an error if key doesn't exist.
 func (b *Backend) Delete(ctx context.Context, key string) error {
 	_, err := pack.Of[entryRow](b.db).Where(entryCol.Key.Eq(key)).DeleteAll(ctx)
 	return err
 }
 
+// Exist reports whether key is present and unexpired, evicting it,
+// best-effort, as a side effect if it has expired.
 func (b *Backend) Exist(ctx context.Context, key string) (bool, error) {
 	_, ok, err := b.lookup(ctx, key)
 	return ok, err
 }
 
+// Clear removes every entry.
 func (b *Backend) Clear(ctx context.Context) error {
 	_, err := pack.Of[entryRow](b.db).DeleteAll(ctx)
 	return err

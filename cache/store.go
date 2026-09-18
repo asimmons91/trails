@@ -1,3 +1,11 @@
+// Package cache provides a generic caching layer over a pluggable Store:
+// Fetch, Read, and Write cache arbitrary JSON-encodable values, and
+// FetchFragment caches rendered view fragments. Store itself only deals in
+// raw bytes, keys, and TTLs — cache/backend/memory and
+// cache/backend/database are the two Store implementations trails ships,
+// cache/httpcache builds an HTTP response-caching middleware on a Store,
+// and cache/cachetest provides a call-counting Store decorator plus
+// assertion helpers for testing code that depends on one.
 package cache
 
 import (
@@ -5,6 +13,10 @@ import (
 	"time"
 )
 
+// Store is the raw byte-oriented cache backend that Fetch, Read, Write,
+// and FetchFragment build on. Values and keys are opaque to Store itself
+// — encoding (e.g. Fetch/Read/Write's JSON envelope) is the caller's
+// responsibility.
 type Store interface {
 	Read(ctx context.Context, key string) ([]byte, bool, error)
 	Write(ctx context.Context, key string, value []byte, ttl time.Duration) error

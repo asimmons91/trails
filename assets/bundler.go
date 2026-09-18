@@ -7,8 +7,11 @@ import (
 	"path/filepath"
 )
 
+// PackageManager identifies the CLI used to run package.json scripts.
 type PackageManager string
 
+// Package managers recognized by DetectPackageManager. PackageManagerNPM
+// is also the default when no lockfile is found.
 const (
 	PackageManagerNPM  PackageManager = "npm"
 	PackageManagerYarn PackageManager = "yarn"
@@ -16,9 +19,16 @@ const (
 	PackageManagerBun  PackageManager = "bun"
 )
 
+// BundlerConfig configures RunBundlerScripts.
 type BundlerConfig struct {
-	Dir     string
+	// Dir is the working directory containing package.json. Empty
+	// defaults to ".".
+	Dir string
+	// Manager is the package manager CLI to invoke. Empty auto-detects
+	// via DetectPackageManager(Dir).
 	Manager PackageManager
+	// Scripts are the package.json scripts to run, in order. The first
+	// one that fails stops the rest.
 	Scripts []string
 }
 
@@ -32,6 +42,11 @@ var lockFileManagers = []struct {
 	{"package-lock.json", PackageManagerNPM},
 }
 
+// DetectPackageManager inspects dir for a lockfile — yarn.lock,
+// pnpm-lock.yaml, bun.lock, or package-lock.json, checked in that
+// priority order — and returns the corresponding PackageManager. If dir
+// contains more than one, the first match in that order wins; if none is
+// found, it defaults to PackageManagerNPM.
 func DetectPackageManager(dir string) PackageManager {
 	for _, lf := range lockFileManagers {
 		if _, err := os.Stat(filepath.Join(dir, lf.file)); err == nil {
@@ -84,6 +99,10 @@ func runCommand(dir string, manager PackageManager, args []string) error {
 	return nil
 }
 
+// RunBundlerScripts runs cfg.Scripts in order via cfg's package manager
+// (see BundlerConfig), stopping at the first script that fails. Each
+// script's stdout/stderr are passed through to the current process's own
+// stdout/stderr, not captured.
 func RunBundlerScripts(cfg BundlerConfig) error {
 	manager := cfg.manager()
 	dir := cfg.dir()

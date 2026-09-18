@@ -41,8 +41,7 @@ var ErrPasswordConfirmationMismatch = errors.New("auth: password confirmation do
 //
 // Password and PasswordConfirmation are virtual (`db:"-"`): they're never
 // persisted and are cleared after a successful hash. Leaving Password blank
-// on an update leaves the stored PasswordDigest untouched — the same
-// "don't touch it unless the field was filled in" convention as Rails.
+// on an update leaves the stored PasswordDigest untouched.
 //
 // Go has no callback chaining, so if the embedding model needs its own
 // BeforeInsert/BeforeUpdate too, defining one on the model shadows this
@@ -118,9 +117,7 @@ var dummyDigest = sync.OnceValue(func() string {
 // `user, _ := findByEmail(email); user.Authenticate(password)` pattern
 // would return near-instantly for a nonexistent user but take the full
 // bcrypt cost for a real one with a wrong password — a timing oracle for
-// user enumeration (see Rails' authenticate_by / Django's
-// ModelBackend.authenticate, which both hash a dummy password for the same
-// reason).
+// user enumeration.
 func (p *SecurePassword) Authenticate(password string) bool {
 	digest := p.PasswordDigest
 	if digest == "" {

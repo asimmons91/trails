@@ -5,6 +5,12 @@ import (
 	"sort"
 )
 
+// MergeFS presents roots as one fs.FS: Open returns the first root that
+// has the requested name (later roots are only consulted if earlier ones
+// return an error), while ReadDir instead unions every root's listing for
+// a directory, first-root-wins on a name collision. There is no Sub,
+// Stat, or Glob of its own — those work via the generic io/fs helpers
+// built on Open/ReadDir.
 func MergeFS(roots ...fs.FS) fs.FS {
 	return &mergedFS{roots: roots}
 }

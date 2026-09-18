@@ -13,21 +13,38 @@ import (
 
 // MaxBodyBytes caps the size of JSON/XML request bodies BindBody will read.
 // It defaults to 4MB. A body over the limit fails with an HTTPError (413
-// Payload Too Large) instead of being read in full.
+// Payload Too Large) instead of being read in full. It has no effect on
+// form or multipart bodies — multipart/form-data uses its own fixed 32MB
+// limit (net/http's ParseMultipartForm) instead.
 var MaxBodyBytes int64 = 4 << 20
 
+// Binder populates target from a request. DefaultBinder is used unless
+// TrailOptions.Binder overrides it.
 type Binder interface {
 	Bind(c *Context, target any) error
 }
 
+// Unmarshaler lets a type customize how the path/query/form binding path
+// (not JSON/XML) parses a single string value into it, consulted before
+// falling back to the built-in scalar kinds (string/bool/int*/uint*/
+// float*).
 type Unmarshaler interface {
 	UnmarshalParam(value string) error
 }
 
 type bindLookupFunc func(name string) ([]string, bool)
 
+// DefaultBinder is the Binder trails uses unless TrailOptions.Binder
+// overrides it.
 type DefaultBinder struct{}
 
+// Bind populates target from, in order, path params (BindPathParams),
+// query params (BindQueryParams), and — only if the request has a body —
+// the request body (BindBody). Each stage stops and returns immediately
+// on error, so a later stage never overwrites a field an earlier stage
+// already failed on; but if a field is tagged for more than one stage
+// (e.g. both param and query), a later stage's value does silently
+// overwrite an earlier one's on success.
 func (d *DefaultBinder) Bind(c *Context, target any) error {
 	if err := BindPathParams(c, target); err != nil {
 		return err
@@ -44,6 +61,9 @@ func (d *DefaultBinder) Bind(c *Context, target any) error {
 	return BindBody(c, target)
 }
 
+// BindPathParams sets each field of dst tagged `param:"name"` from
+// name's path value (see net/http's ServeMux path patterns). A field
+// whose path value is empty or absent is left unset.
 func BindPathParams(c *Context, dst any) error {
 	return bindTagSource(dst, "param", func(name string) ([]string, bool) {
 		v := c.Request().PathValue(name)
@@ -54,6 +74,10 @@ func BindPathParams(c *Context, dst any) error {
 	})
 }
 
+// BindQueryParams sets each field of dst tagged `query:"name"` from
+// name's query parameter(s). A slice field collects every value for a
+// repeated query key; a scalar field takes the first. A field whose
+// query key is absent is left unset.
 func BindQueryParams(c *Context, dst any) error {
 	values := c.Request().URL.Query()
 	return bindTagSource(dst, "query", func(name string) ([]string, bool) {
@@ -62,6 +86,16 @@ func BindQueryParams(c *Context, dst any) error {
 	})
 }
 
+// BindBody decodes the request body into dst according to its
+// Content-Type: application/json and application/xml/text/xml are
+// decoded directly via encoding/json/encoding/xml against dst's own
+// json/xml tags (so nested structs and slices are fully supported), each
+// capped at MaxBodyBytes; application/x-www-form-urlencoded and
+// multipart/form-data are instead parsed into dst's `form:"name"`-tagged
+// fields the same reflection-based way BindQueryParams uses — which only
+// supports top-level scalar and slice-of-scalar fields (or a field
+// implementing Unmarshaler), not nested structs. Any other Content-Type
+// is an error.
 func BindBody(c *Context, dst any) error {
 	ctype := c.Request().Header.Get("Content-Type")
 	mediaType, _, err := mime.ParseMediaType(ctype)
