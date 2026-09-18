@@ -36,6 +36,23 @@ func Routes(db *pack.DB, jobsBackend jobs.Backend, cacheStore cache.Store, cache
 		// (Static above is unaffected — it bypasses middleware entirely).
 		r.Use(secureheaders.Middleware(), session.Middleware(secretKeyBase), csrf.Middleware())
 
+		// trustedproxy resolves the real client IP/scheme from
+		// X-Forwarded-For/X-Forwarded-Proto, but only behind a reverse
+		// proxy on a known network — there is no default trusted list.
+		// It's independent of allowedhosts below (composable in either
+		// order) and safe to leave unconfigured otherwise:
+		//
+		// r.Use(trustedproxy.Middleware(trustedproxy.WithTrustedProxies(trustedproxy.PrivateCIDRs...)))
+
+		// allowedhosts is off by default (no allowed hosts configured) —
+		// enable it once you know your app's real hostname(s) to
+		// validate the Host header before any handler runs. If enabled,
+		// register it outermost, ahead of the r.Use above, so a
+		// disallowed Host is rejected before any other middleware does
+		// work:
+		//
+		// r.Use(allowedhosts.Middleware(allowedhosts.WithAllowedHosts("example.com", ".example.com")))
+
 		// CORS is off by default (no allowed origins configured) — most
 		// server-rendered trails apps have no separate cross-origin
 		// frontend to allow. If you're serving a separate SPA/mobile
