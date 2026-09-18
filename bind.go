@@ -3,11 +3,18 @@ package trails
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"mime"
+	"net/http"
 	"reflect"
 	"strconv"
 )
+
+// MaxBodyBytes caps the size of JSON/XML request bodies BindBody will read.
+// It defaults to 4MB. A body over the limit fails with an HTTPError (413
+// Payload Too Large) instead of being read in full.
+var MaxBodyBytes int64 = 4 << 20
 
 type Binder interface {
 	Bind(c *Context, target any) error
@@ -64,15 +71,17 @@ func BindBody(c *Context, dst any) error {
 
 	switch mediaType {
 	case "application/json":
-		dec := json.NewDecoder(c.Request().Body)
+		body := http.MaxBytesReader(c.Response(), c.Request().Body, MaxBodyBytes)
+		dec := json.NewDecoder(body)
 		if err := dec.Decode(dst); err != nil {
-			return fmt.Errorf("bind: decoding JSON body: %w", err)
+			return bodyDecodeError("JSON", err)
 		}
 
 	case "application/xml", "text/xml":
-		dec := xml.NewDecoder(c.Request().Body)
+		body := http.MaxBytesReader(c.Response(), c.Request().Body, MaxBodyBytes)
+		dec := xml.NewDecoder(body)
 		if err := dec.Decode(dst); err != nil {
-			return fmt.Errorf("bin: decoding XML body: %w", err)
+			return bodyDecodeError("XML", err)
 		}
 
 	case "application/x-www-form-urlencoded":
@@ -97,6 +106,15 @@ func BindBody(c *Context, dst any) error {
 	}
 
 	return nil
+}
+
+func bodyDecodeError(kind string, err error) error {
+	var mbErr *http.MaxBytesError
+	if errors.As(err, &mbErr) {
+		return NewHTTPError(http.StatusRequestEntityTooLarge,
+			fmt.Errorf("bind: %s body exceeds %d byte limit: %w", kind, MaxBodyBytes, err))
+	}
+	return fmt.Errorf("bind: decoding %s body: %w", kind, err)
 }
 
 func bindTagSource(dst any, tag string, lookup bindLookupFunc) error {
