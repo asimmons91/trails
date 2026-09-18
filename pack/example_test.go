@@ -132,6 +132,26 @@ func ExampleQuery_Scopes() {
 	// ada@example.com
 }
 
+// ExampleQuery_SkipHooks shows why a set-based Delete/DeleteAll/Update can
+// refuse to run: testHookedItem implements BeforeDelete/AfterDelete, and
+// those hooks can't fire for a set-based statement (no Go instance exists
+// per affected row), so DeleteAll returns ErrSetOperationBlockedByHooks.
+// Calling SkipHooks first opts out of that check and lets it run.
+func ExampleQuery_SkipHooks() {
+	fake := testdb.New()
+	db := Open(fake.Open(), pgdialect.New())
+
+	_, err := Of[testHookedItem](db).Where(hookedItemCol.Name.Eq("x")).DeleteAll(context.Background())
+	fmt.Println(err)
+
+	fake.Enqueue(testdb.Result{RowsAffected: 1})
+	n, err := Of[testHookedItem](db).Where(hookedItemCol.Name.Eq("x")).SkipHooks().DeleteAll(context.Background())
+	fmt.Println(n, err)
+	// Output:
+	// pack: testHookedItem implements a hook relevant to a set-based Delete, which cannot fire (no Go instance exists per row); call .SkipHooks() to proceed anyway
+	// 1 <nil>
+}
+
 func ExampleQuery_Rows() {
 	fake := testdb.New()
 	db := Open(fake.Open(), pgdialect.New())

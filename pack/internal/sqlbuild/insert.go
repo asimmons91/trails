@@ -6,6 +6,8 @@ import (
 	"github.com/asimmons91/trails/pack/dialect"
 )
 
+// InsertBuilder builds an INSERT statement, one or more rows at a time,
+// with optional RETURNING and ON CONFLICT clauses. Build one with Insert.
 type InsertBuilder struct {
 	table     Table
 	rows      [][]Assignment
@@ -16,6 +18,7 @@ type InsertBuilder struct {
 	conflictUpdate    []Assignment
 }
 
+// Insert starts an InsertBuilder inserting into t.
 func Insert(t Table) *InsertBuilder {
 	return &InsertBuilder{table: t}
 }
@@ -25,18 +28,27 @@ func (b *InsertBuilder) clone() *InsertBuilder {
 	return &nb
 }
 
+// Values adds one row of column assignments. Called more than once, each
+// call adds another row to a single multi-row INSERT; every row must
+// assign the same set of columns.
 func (b *InsertBuilder) Values(a ...Assignment) *InsertBuilder {
 	nb := b.clone()
 	nb.rows = appendFresh(nb.rows, append([]Assignment(nil), a...))
 	return nb
 }
 
+// Returning adds a RETURNING clause for cols. Render errors if the dialect
+// doesn't support RETURNING (Dialect.SupportsReturning).
 func (b *InsertBuilder) Returning(cols ...Column) *InsertBuilder {
 	nb := b.clone()
 	nb.returning = appendFresh(nb.returning, cols...)
 	return nb
 }
 
+// OnConflictDoNothing makes a conflict on cols a no-op instead of an
+// error. Render emits ON CONFLICT (cols) DO NOTHING on a dialect that
+// supports it (Dialect.SupportsOnConflict), or MySQL's equivalent
+// INSERT IGNORE INTO otherwise.
 func (b *InsertBuilder) OnConflictDoNothing(cols ...Column) *InsertBuilder {
 	nb := b.clone()
 	nb.conflictCols = append([]Column(nil), cols...)
@@ -45,6 +57,11 @@ func (b *InsertBuilder) OnConflictDoNothing(cols ...Column) *InsertBuilder {
 	return nb
 }
 
+// OnConflictDoUpdate makes a conflict on cols apply assignments to the
+// existing row instead of erroring. Render emits
+// ON CONFLICT (cols) DO UPDATE SET ... on a dialect that supports it
+// (Dialect.SupportsOnConflict), or MySQL's equivalent
+// ON DUPLICATE KEY UPDATE ... otherwise.
 func (b *InsertBuilder) OnConflictDoUpdate(cols []Column, assignments ...Assignment) *InsertBuilder {
 	nb := b.clone()
 	nb.conflictCols = append([]Column(nil), cols...)
@@ -53,6 +70,11 @@ func (b *InsertBuilder) OnConflictDoUpdate(cols []Column, assignments ...Assignm
 	return nb
 }
 
+// Render renders b as INSERT SQL for dialect d, choosing between
+// Postgres/SQLite-style ON CONFLICT and MySQL-style
+// INSERT IGNORE/ON DUPLICATE KEY UPDATE per Dialect.SupportsOnConflict.
+// It errors with ErrReturningUnsupportedByDialect if Returning was called
+// against a dialect that can't honor it.
 func (b *InsertBuilder) Render(d dialect.Dialect) (string, []any, error) {
 	if len(b.returning) > 0 && !d.SupportsReturning() {
 		return "", nil, &ErrReturningUnsupportedByDialect{Dialect: d.Name()}

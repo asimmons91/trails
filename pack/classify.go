@@ -8,12 +8,18 @@ type noopErrorDecoder struct{}
 
 func (noopErrorDecoder) Classify(err error) (string, bool) { return "", false }
 
+// WithErrorDecoder overrides the driver.ErrorDecoder Connect/Open would
+// otherwise use for classifying database errors into the Err*Violation
+// types (see classifyError).
 func WithErrorDecoder(d driver.ErrorDecoder) Option {
 	return func(o *dbOptions) {
 		o.errDecoder = d
 	}
 }
 
+// classifyError turns a raw driver error into one of the Err*Violation
+// types via db's configured driver.ErrorDecoder, or returns err unchanged
+// if the decoder doesn't recognize it (or err is nil).
 func classifyError(db *DB, op, model string, err error) error {
 	if err == nil {
 		return nil

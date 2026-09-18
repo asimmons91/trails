@@ -1,3 +1,5 @@
+// Package sqlite implements driver.Driver and driver.ErrorDecoder for
+// SQLite, via modernc.org/sqlite (a CGo-free driver).
 package sqlite
 
 import (
@@ -10,22 +12,30 @@ import (
 	sqlitedriver "modernc.org/sqlite"
 )
 
+// Driver implements driver.Driver and driver.ErrorDecoder for SQLite.
 type Driver struct{}
 
 var _ driver.Driver = Driver{}
 
+// New returns a SQLite Driver.
 func New() Driver { return Driver{} }
 
+// Name returns "sqlite".
 func (Driver) Name() string { return "sqlite" }
 
+// Open opens dsn via the modernc.org/sqlite driver.
 func (Driver) Open(dsn string) (*sql.DB, error) {
 	return sql.Open("sqlite", dsn)
 }
 
+// Dialect returns a sqlitedialect.SQLite.
 func (Driver) Dialect() dialect.Dialect { return sqlitedialect.New() }
 
 var _ driver.ErrorDecoder = Driver{}
 
+// Classify maps a *sqlite.Error's extended result code to a driver.Code*
+// constant, per the table below; any other error, or a non-SQLite error,
+// returns ok=false.
 func (Driver) Classify(err error) (string, bool) {
 	var se *sqlitedriver.Error
 	if !errors.As(err, &se) {

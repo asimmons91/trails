@@ -1,3 +1,8 @@
+// Package testdb is a queue-driven fake *sql.DB for testing pack without a
+// real database. FakeDB.Enqueue primes canned Results that Open's
+// connection dequeues FIFO on each Exec/Query, while Executed, TxEvents,
+// and RowsClosedCount record what actually happened for a test to assert
+// against.
 package testdb
 
 import (

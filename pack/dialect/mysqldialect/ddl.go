@@ -40,6 +40,7 @@ func (MySQL) baseType(t reflect.Type) (string, error) {
 	return "", fmt.Errorf("mysqldialect: no SQL type mapping for Go type %s; set a `type:` struct tag", t)
 }
 
+// ColumnDefinition implements dialect.DDL.
 func (d MySQL) ColumnDefinition(t reflect.Type, spec dialect.ColumnSpec) (string, error) {
 	sqlType := spec.SQLType
 	if sqlType == "" {
@@ -67,8 +68,14 @@ func (d MySQL) ColumnDefinition(t reflect.Type, spec dialect.ColumnSpec) (string
 	return def, nil
 }
 
+// InlinesPrimaryKey is always false; MySQL writes a primary key as a
+// separate table-level constraint, never inline in the column definition.
 func (MySQL) InlinesPrimaryKey(dialect.ColumnSpec) bool { return false }
 
+// AlterColumnSQL renders an ALTER TABLE ... MODIFY COLUMN statement,
+// reusing ColumnDefinition to describe the column's new shape in full
+// (MySQL's MODIFY COLUMN requires restating the complete definition, not
+// just the changed piece).
 func (d MySQL) AlterColumnSQL(table, column string, t reflect.Type, spec dialect.ColumnSpec) (string, error) {
 	def, err := d.ColumnDefinition(t, spec)
 	if err != nil {
@@ -78,34 +85,43 @@ func (d MySQL) AlterColumnSQL(table, column string, t reflect.Type, spec dialect
 	return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s", d.QuoteIdent(table), d.QuoteIdent(column), def), nil
 }
 
+// DropIndexSQL implements dialect.DDL; MySQL's DROP INDEX requires the
+// owning table, unlike Postgres/SQLite.
 func (d MySQL) DropIndexSQL(table, index string) string {
 	return "DROP INDEX " + d.QuoteIdent(index) + " ON " + d.QuoteIdent(table)
 }
 
+// RenameIndexSQL renders an ALTER TABLE ... RENAME INDEX statement.
 func (d MySQL) RenameIndexSQL(table, oldName, newName string) (string, error) {
 	return fmt.Sprintf("ALTER TABLE %s RENAME INDEX %s TO %s", d.QuoteIdent(table), d.QuoteIdent(oldName), d.QuoteIdent(newName)), nil
 }
 
+// HasTableSQL implements dialect.DDL, scoped to the current database.
 func (MySQL) HasTableSQL(table string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?)", []any{table}
 }
 
+// HasColumnSQL implements dialect.DDL, scoped to the current database.
 func (MySQL) HasColumnSQL(table, column string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?)", []any{table, column}
 }
 
+// HasIndexSQL implements dialect.DDL, scoped to the current database.
 func (MySQL) HasIndexSQL(table, index string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?)", []any{table, index}
 }
 
+// HasConstraintSQL implements dialect.DDL, scoped to the current database.
 func (MySQL) HasConstraintSQL(table, name string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = ? AND constraint_name = ?)", []any{table, name}
 }
 
+// GetTablesSQL implements dialect.DDL, scoped to the current database.
 func (MySQL) GetTablesSQL() (string, []any) {
 	return "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name", nil
 }
 
+// ColumnTypesSQL implements dialect.DDL, scoped to the current database.
 func (MySQL) ColumnTypesSQL(table string) (string, []any) {
 	return `SELECT column_name, data_type, (is_nullable = 'YES') AS nullable, (column_key = 'PRI') AS is_primary_key
 		FROM information_schema.columns
@@ -113,4 +129,5 @@ func (MySQL) ColumnTypesSQL(table string) (string, []any) {
 		ORDER BY ordinal_position`, []any{table}
 }
 
+// CurrentDatabaseSQL returns the current database's name.
 func (MySQL) CurrentDatabaseSQL() string { return "SELECT DATABASE()" }

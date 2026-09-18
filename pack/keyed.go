@@ -10,6 +10,9 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// ByID fetches the single row of T whose primary key is id, equivalent to
+// Of[T](db).Where(pk.Eq(id)).First(ctx). Returns ErrNoRows if none
+// matches.
 func ByID[T Entity[ID], ID comparable](ctx context.Context, db *DB, id ID) (T, error) {
 	var zero T
 	t := reflect.TypeFor[T]()
@@ -26,6 +29,8 @@ func ByID[T Entity[ID], ID comparable](ctx context.Context, db *DB, id ID) (T, e
 	return Of[T](db).Where(Predicate{p: p}).First(ctx)
 }
 
+// Update writes every mapped field of row back to its row (matched by
+// primary key), firing before/after-update hooks if T implements them.
 func Update[T Entity[ID], ID comparable](ctx context.Context, db *DB, row *T) error {
 	t := reflect.TypeFor[T]()
 	table, err := schema.For(t)
@@ -75,6 +80,8 @@ func Update[T Entity[ID], ID comparable](ctx context.Context, db *DB, row *T) er
 	return nil
 }
 
+// Save inserts row via Create if its primary key is still ID's zero
+// value, otherwise writes it via Update.
 func Save[T Entity[ID], ID comparable](ctx context.Context, db *DB, row *T) error {
 	var zeroID ID
 	if (*row).PK() == zeroID {
@@ -84,6 +91,10 @@ func Save[T Entity[ID], ID comparable](ctx context.Context, db *DB, row *T) erro
 	return Update[T, ID](ctx, db, row)
 }
 
+// Delete deletes the row of T whose primary key is id. It's a no-op, not
+// an error, if no row matches. The row is fetched first (via ByID) only
+// if T implements a before/after-delete hook, so the hook has a value to
+// run against.
 func Delete[T Entity[ID], ID comparable](ctx context.Context, db *DB, id ID) error {
 	t := reflect.TypeFor[T]()
 	table, err := schema.For(t)

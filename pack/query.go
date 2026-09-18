@@ -13,6 +13,11 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// Query[T] is a chainable, immutable query builder for model T, produced
+// by Of. Every chain method returns a new *Query[T] (see clone) rather
+// than mutating the receiver, so a partially-built Query can be safely
+// branched and reused. Run it with Find, Rows, First, Count, or Exists, or
+// use it as a set-based Update/Delete target.
 type Query[T any] struct {
 	db    *DB
 	table *schema.Table
@@ -35,6 +40,8 @@ type Query[T any] struct {
 	skipHooks  bool
 }
 
+// Of starts a query against T's mapped table. Panics if T isn't a valid
+// pack model (no schema.For(T) mapping).
 func Of[T any](db *DB) *Query[T] {
 	t := reflect.TypeFor[T]()
 	table, err := schema.For(t)
@@ -52,21 +59,29 @@ func Of[T any](db *DB) *Query[T] {
 	}
 }
 
+// clone copies q so a chain method can mutate the copy, keeping every
+// *Query[T] value returned so far unmodified (copy-on-write).
 func (q *Query[T]) clone() *Query[T] {
 	nq := *q
 	return &nq
 }
 
+// Where AND-s p onto the query's existing WHERE condition, if any.
 func (q *Query[T]) Where(p Predicate) *Query[T] {
 	nq := q.clone()
 	nq.where = andJoin(nq.where, p.p)
 	return nq
 }
 
+// WhereRaw AND-s a raw SQL fragment onto the WHERE condition, with $-numbered
+// placeholders in fragment bound to args.
 func (q *Query[T]) WhereRaw(fragment string, args ...any) *Query[T] {
 	return q.Where(rawPredicate(fragment, args...))
 }
 
+// Or OR-s p onto everything accumulated by Where/Or so far — not just the
+// most recent one — so `.Where(a).Where(b).Or(c)` produces `(a AND b) OR
+// c`, not `a AND (b OR c)`.
 func (q *Query[T]) Or(p Predicate) *Query[T] {
 	nq := q.clone()
 	nq.where = orJoin(nq.where, p.p)
@@ -76,6 +91,8 @@ func (q *Query[T]) Or(p Predicate) *Query[T] {
 // Scope is a reusable, composable query modifier, applied via Query[T].Scopes.
 type Scope[T any] func(*Query[T]) *Query[T]
 
+// Scopes applies each of scopes to q in order, threading the result of one
+// into the next.
 func (q *Query[T]) Scopes(scopes ...Scope[T]) *Query[T] {
 	nq := q
 	for _, s := range scopes {
@@ -84,6 +101,8 @@ func (q *Query[T]) Scopes(scopes ...Scope[T]) *Query[T] {
 	return nq
 }
 
+// Order adds ORDER BY terms (see Col's Asc/Desc), appended after any
+// already set.
 func (q *Query[T]) Order(terms ...OrderTerm[T]) *Query[T] {
 	nq := q.clone()
 	raw := make([]sqlbuild.OrderTerm, len(terms))
@@ -94,72 +113,90 @@ func (q *Query[T]) Order(terms ...OrderTerm[T]) *Query[T] {
 	return nq
 }
 
+// OrderRaw appends a raw ORDER BY term.
 func (q *Query[T]) OrderRaw(fragment string) *Query[T] {
 	nq := q.clone()
 	nq.order = appendFresh(nq.order, sqlbuild.OrderRaw(fragment))
 	return nq
 }
 
+// Limit sets LIMIT n.
 func (q *Query[T]) Limit(n int64) *Query[T] {
 	nq := q.clone()
 	nq.limit = &n
 	return nq
 }
 
+// Offset sets OFFSET n.
 func (q *Query[T]) Offset(n int64) *Query[T] {
 	nq := q.clone()
 	nq.offset = &n
 	return nq
 }
 
+// GroupBy adds GROUP BY columns, appended after any already set.
 func (q *Query[T]) GroupBy(cols ...AnyCol[T]) *Query[T] {
 	nq := q.clone()
 	nq.groupBy = appendFresh(nq.groupBy, cols...)
 	return nq
 }
 
+// Having AND-s p onto the query's existing HAVING condition, if any.
 func (q *Query[T]) Having(p Predicate) *Query[T] {
 	nq := q.clone()
 	nq.having = andJoin(nq.having, p.p)
 	return nq
 }
 
+// Distinct adds SELECT DISTINCT.
 func (q *Query[T]) Distinct() *Query[T] {
 	nq := q.clone()
 	nq.distinct = true
 	return nq
 }
 
+// Select restricts the columns fetched to cols instead of every mapped
+// field, appended after any already set.
 func (q *Query[T]) Select(cols ...AnyCol[T]) *Query[T] {
 	nq := q.clone()
 	nq.selectCols = appendFresh(nq.selectCols, cols...)
 	return nq
 }
 
+// SelectRaw appends a raw SQL select expression.
 func (q *Query[T]) SelectRaw(fragment string) *Query[T] {
 	nq := q.clone()
 	nq.selectRaw = appendFresh(nq.selectRaw, fragment)
 	return nq
 }
 
+// ForUpdate adds a FOR UPDATE row-locking clause. Requires
+// dialect.Dialect.SupportsRowLocking.
 func (q *Query[T]) ForUpdate() *Query[T] {
 	nq := q.clone()
 	nq.forUpdate = true
 	return nq
 }
 
+// ForShare adds a FOR SHARE row-locking clause. Requires
+// dialect.Dialect.SupportsRowLocking.
 func (q *Query[T]) ForShare() *Query[T] {
 	nq := q.clone()
 	nq.forShare = true
 	return nq
 }
 
+// SkipLocked adds SKIP LOCKED to a ForUpdate/ForShare clause.
 func (q *Query[T]) SkipLocked() *Query[T] {
 	nq := q.clone()
 	nq.skipLocked = true
 	return nq
 }
 
+// SkipHooks lets a set-based Update or Delete/DeleteAll run even though T
+// implements a hook relevant to that operation, which otherwise blocks it
+// with ErrSetOperationBlockedByHooks (the hook simply won't fire, since no
+// Go instance exists per affected row).
 func (q *Query[T]) SkipHooks() *Query[T] {
 	nq := q.clone()
 	nq.skipHooks = true
@@ -194,6 +231,8 @@ func (q *Query[T]) groupByColumns() []sqlbuild.Column {
 	return cols
 }
 
+// buildSelect assembles every clause accumulated on q into a
+// sqlbuild.SelectBuilder, ready to Render.
 func (q *Query[T]) buildSelect() *sqlbuild.SelectBuilder {
 	b := sqlbuild.Select(q.sqlTable).Columns(q.selectColumns()...)
 
@@ -252,6 +291,8 @@ func (q *Query[T]) buildSelect() *sqlbuild.SelectBuilder {
 	return b
 }
 
+// Find runs q and returns every matching row, running any Preload chains
+// afterward.
 func (q *Query[T]) Find(ctx context.Context) ([]T, error) {
 	sqlText, args, err := q.buildSelect().Render(q.db.dialect)
 	if err != nil {
@@ -278,6 +319,12 @@ func (q *Query[T]) Find(ctx context.Context) ([]T, error) {
 	return result, nil
 }
 
+// Rows runs q and streams matching rows one at a time instead of loading
+// them all into memory, stopping early if the yield func returns false or
+// ctx is done. It cannot be combined with Preload — batch-loading a
+// relation needs every parent row up front, which streaming doesn't
+// provide — and returns an error instead of iterating if any Preload was
+// set.
 func (q *Query[T]) Rows(ctx context.Context) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		var zero T
@@ -329,6 +376,9 @@ func (q *Query[T]) Rows(ctx context.Context) iter.Seq2[T, error] {
 
 }
 
+// First runs q with an added LIMIT 1 and returns the single matching row,
+// running any Preload chains on it afterward. Unlike Find, it returns
+// ErrNoRows if nothing matches.
 func (q *Query[T]) First(ctx context.Context) (T, error) {
 	var zero T
 
@@ -366,6 +416,8 @@ func (q *Query[T]) First(ctx context.Context) (T, error) {
 	return row, nil
 }
 
+// Count returns the number of rows q's WHERE/GROUP BY/HAVING clauses
+// match.
 func (q *Query[T]) Count(ctx context.Context) (int64, error) {
 	b := sqlbuild.Select(q.sqlTable).SelectRaw("count(*)")
 	if !q.where.IsZero() {
@@ -403,6 +455,7 @@ func (q *Query[T]) Count(ctx context.Context) (int64, error) {
 	return n, nil
 }
 
+// Exists reports whether q's WHERE clause matches at least one row.
 func (q *Query[T]) Exists(ctx context.Context) (bool, error) {
 	b := sqlbuild.Select(q.sqlTable).SelectRaw("1").Limit(1)
 	if !q.where.IsZero() {
@@ -427,6 +480,11 @@ func (q *Query[T]) Exists(ctx context.Context) (bool, error) {
 	return has, nil
 }
 
+// Update applies assignments to every row matching q's WHERE clause (every
+// row of the table if none is set) and returns the number of rows
+// affected. It's a set-based operation — it never materializes a Go T for
+// each affected row — so it returns ErrSetOperationBlockedByHooks if T
+// implements a before/after-update hook, unless SkipHooks was called.
 func (q *Query[T]) Update(ctx context.Context, assignments ...Assignment) (int64, error) {
 	if !q.skipHooks && (q.table.Hooks.BeforeUpdate || q.table.Hooks.AfterUpdate) {
 		return 0, &ErrSetOperationBlockedByHooks{Model: q.table.GoType.Name(), Operation: "Update"}
@@ -454,6 +512,11 @@ func (q *Query[T]) Update(ctx context.Context, assignments ...Assignment) (int64
 	return res.RowsAffected()
 }
 
+// Delete deletes every row matching q's WHERE clause and returns the
+// number of rows affected. As a safety rail against an accidental
+// whole-table delete, it errors if no WHERE condition was set — call
+// DeleteAll to delete every row deliberately. Subject to the same
+// hook-blocking as Update.
 func (q *Query[T]) Delete(ctx context.Context) (int64, error) {
 	if q.where.IsZero() {
 		return 0, fmt.Errorf(
@@ -465,6 +528,10 @@ func (q *Query[T]) Delete(ctx context.Context) (int64, error) {
 	return q.deleteRows(ctx)
 }
 
+// DeleteAll deletes every row matching q's WHERE clause (every row of the
+// table if none is set) and returns the number of rows affected. Unlike
+// Delete, it does not require a WHERE condition. Subject to the same
+// hook-blocking as Update.
 func (q *Query[T]) DeleteAll(ctx context.Context) (int64, error) {
 	return q.deleteRows(ctx)
 }
@@ -491,6 +558,9 @@ func (q *Query[T]) deleteRows(ctx context.Context) (int64, error) {
 	return res.RowsAffected()
 }
 
+// schemaForOrPanic resolves T's schema.Table or panics naming caller —
+// used by every entry point (Of, Create, Relation, Join, ...) that takes a
+// pack model as a type parameter instead of a value.
 func schemaForOrPanic[T any](caller string) *schema.Table {
 	t := reflect.TypeFor[T]()
 	table, err := schema.For(t)
@@ -501,6 +571,9 @@ func schemaForOrPanic[T any](caller string) *schema.Table {
 	return table
 }
 
+// appendFresh returns a fresh slice combining base and more, so a chain
+// method's clone doesn't share (and risk mutating) another Query's
+// backing array.
 func appendFresh[E any](base []E, more ...E) []E {
 	out := make([]E, len(base)+len(more))
 	copy(out, base)
@@ -508,6 +581,7 @@ func appendFresh[E any](base []E, more ...E) []E {
 	return out
 }
 
+// andJoin AND-s b onto a, or just returns b if a hasn't been set yet.
 func andJoin(a, b sqlbuild.Predicate) sqlbuild.Predicate {
 	if a.IsZero() {
 		return b
@@ -516,6 +590,7 @@ func andJoin(a, b sqlbuild.Predicate) sqlbuild.Predicate {
 	return sqlbuild.And(a, b)
 }
 
+// orJoin OR-s b onto a, or just returns b if a hasn't been set yet.
 func orJoin(a, b sqlbuild.Predicate) sqlbuild.Predicate {
 	if a.IsZero() {
 		return b

@@ -10,6 +10,12 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// bindableValue converts f's reflected value into something a SQL driver
+// can bind: a NullZero field at its zero value becomes nil, a
+// json/jsonb-tagged field is json.Marshal-ed to []byte (a nil slice first
+// becomes an empty one, so it marshals to "[]" rather than "null"), and an
+// unsigned field wider than int64 errors as ErrUintOverflow rather than
+// silently wrapping. Everything else binds as-is.
 func bindableValue(modelName string, f *schema.Field, fv reflect.Value) (any, error) {
 	if f.Options.NullZero && fv.IsZero() {
 		return nil, nil
@@ -38,6 +44,8 @@ func bindableValue(modelName string, f *schema.Field, fv reflect.Value) (any, er
 	return fv.Interface(), nil
 }
 
+// writeAllAssignments builds a whole-row assignment list for Update: every
+// mapped field except the primary key, bound via bindableValue.
 func writeAllAssignments(modelName string, table *schema.Table, rv reflect.Value) ([]sqlbuild.Assignment, error) {
 	out := make([]sqlbuild.Assignment, 0, len(table.Fields))
 	for i := range table.Fields {
@@ -56,6 +64,8 @@ func writeAllAssignments(modelName string, table *schema.Table, rv reflect.Value
 	return out, nil
 }
 
+// compositeKeyIsZero reports whether every field of table's composite
+// primary key is still at its zero value.
 func compositeKeyIsZero(table *schema.Table, rv reflect.Value) bool {
 	for _, f := range table.PK {
 		if !rv.FieldByIndex(f.Index).IsZero() {
@@ -66,6 +76,10 @@ func compositeKeyIsZero(table *schema.Table, rv reflect.Value) bool {
 	return true
 }
 
+// pkPredicate builds a "primary key = id" predicate (ANDing each column
+// together for a composite key), optionally qualified by alias. Errors if
+// table has no mapped primary key, or id's shape doesn't match a
+// composite key's field count.
 func pkPredicate(table *schema.Table, id any, alias string) (sqlbuild.Predicate, error) {
 	if len(table.PK) == 0 {
 		return sqlbuild.Predicate{}, fmt.Errorf(
@@ -101,6 +115,9 @@ func pkPredicate(table *schema.Table, id any, alias string) (sqlbuild.Predicate,
 	return sqlbuild.And(preds...), nil
 }
 
+// pkPredicateFromRow builds a "primary key = <row's own PK value(s)>"
+// predicate directly from rv's fields, unlike pkPredicate which takes an
+// already-known id value.
 func pkPredicateFromRow(table *schema.Table, rv reflect.Value) sqlbuild.Predicate {
 	preds := make([]sqlbuild.Predicate, len(table.PK))
 	for i, f := range table.PK {
@@ -114,6 +131,9 @@ func pkPredicateFromRow(table *schema.Table, rv reflect.Value) sqlbuild.Predicat
 	return sqlbuild.And(preds...)
 }
 
+// assignInt64 writes v into dest, a pointer to any signed or unsigned
+// integer kind — used to backfill a LastInsertId-sourced auto-increment
+// value, which database/sql only hands back as int64.
 func assignInt64(dest any, v int64) error {
 	rv := reflect.ValueOf(dest)
 	if rv.Kind() != reflect.Pointer {
