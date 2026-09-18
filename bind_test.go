@@ -192,6 +192,39 @@ func TestBindBodyXMLDecodeError(t *testing.T) {
 	require.Contains(t, err.Error(), "decoding XML body")
 }
 
+func withMaxBodyBytes(t *testing.T, limit int64) {
+	t.Helper()
+	original := MaxBodyBytes
+	MaxBodyBytes = limit
+	t.Cleanup(func() { MaxBodyBytes = original })
+}
+
+func TestBindBodyJSONExceedsMaxBodyBytes(t *testing.T) {
+	withMaxBodyBytes(t, 10)
+	body := bytes.NewBufferString(`{"name":"a-name-longer-than-ten-bytes"}`)
+	c := newBindContext(http.MethodPost, "/", body, "application/json")
+
+	err := BindBody(c, &bindJSONTarget{})
+	require.Error(t, err)
+
+	var httpErr HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	require.Equal(t, http.StatusRequestEntityTooLarge, httpErr.StatusCode())
+}
+
+func TestBindBodyXMLExceedsMaxBodyBytes(t *testing.T) {
+	withMaxBodyBytes(t, 10)
+	body := bytes.NewBufferString(`<bindXMLTarget><name>a-name-longer-than-ten-bytes</name></bindXMLTarget>`)
+	c := newBindContext(http.MethodPost, "/", body, "application/xml")
+
+	err := BindBody(c, &bindXMLTarget{})
+	require.Error(t, err)
+
+	var httpErr HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	require.Equal(t, http.StatusRequestEntityTooLarge, httpErr.StatusCode())
+}
+
 func TestBindBodyFormSuccess(t *testing.T) {
 	form := url.Values{}
 	form.Set("name", "bob")
