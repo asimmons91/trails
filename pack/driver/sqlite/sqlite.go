@@ -40,6 +40,10 @@ func (Driver) Classify(err error) (string, bool) {
 		return driver.CodeNotNull, true
 	case 275: // SQLITE_CONSTRAINT_CHECK
 		return driver.CodeCheck, true
+	case 5, 261, 517, 773: // SQLITE_BUSY and its extended (RECOVERY/SNAPSHOT/TIMEOUT) variants
+		return driver.CodeSerializationFailure, true
+	case 6, 262, 518: // SQLITE_LOCKED and its extended (SHAREDCACHE/VTAB) variants
+		return driver.CodeSerializationFailure, true
 	default:
 		return "", false
 	}

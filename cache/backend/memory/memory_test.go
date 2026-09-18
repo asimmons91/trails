@@ -2,6 +2,7 @@ package memory_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -109,6 +110,73 @@ func TestReadReturnsCopyNotSharedSlice(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, "hello", string(value))
+}
+
+func TestIncrementFreshKeyReturnsDelta(t *testing.T) {
+	b := memory.New()
+	ctx := context.Background()
+
+	count, expiresAt, err := b.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+	require.WithinDuration(t, time.Now().Add(time.Minute), expiresAt, time.Second)
+}
+
+func TestIncrementExistingKeyAddsDeltaAndKeepsOriginalExpiry(t *testing.T) {
+	b := memory.New()
+	ctx := context.Background()
+
+	_, first, err := b.Increment(ctx, "counter", 1, time.Hour)
+	require.NoError(t, err)
+
+	count, second, err := b.Increment(ctx, "counter", 1, time.Nanosecond)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), count)
+	require.Equal(t, first, second)
+}
+
+func TestIncrementExpiredKeyResetsInsteadOfAccumulating(t *testing.T) {
+	b := memory.New()
+	ctx := context.Background()
+
+	_, _, err := b.Increment(ctx, "counter", 1, time.Nanosecond)
+	require.NoError(t, err)
+	time.Sleep(time.Millisecond)
+
+	count, _, err := b.Increment(ctx, "counter", 1, time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestIncrementZeroTTLNeverExpires(t *testing.T) {
+	b := memory.New()
+	ctx := context.Background()
+
+	_, expiresAt, err := b.Increment(ctx, "counter", 1, 0)
+	require.NoError(t, err)
+	require.True(t, expiresAt.IsZero())
+}
+
+func TestIncrementIsConcurrencySafe(t *testing.T) {
+	b := memory.New()
+	ctx := context.Background()
+
+	const n = 100
+	var wg sync.WaitGroup
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := b.Increment(ctx, "counter", 1, time.Minute)
+			require.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	value, ok, err := b.Read(ctx, "counter")
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, "100", string(value))
 }
 
 func TestRunSweepsExpiredEntries(t *testing.T) {

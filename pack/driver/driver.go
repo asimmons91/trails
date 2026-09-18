@@ -13,10 +13,11 @@ type Driver interface {
 }
 
 const (
-	CodeUnique     = "ERR_UNIQUE"
-	CodeForeignKey = "ERR_FOREIGN_KEY"
-	CodeNotNull    = "ERR_NOT_NULL"
-	CodeCheck      = "ERR_CHECK"
+	CodeUnique               = "ERR_UNIQUE"
+	CodeForeignKey           = "ERR_FOREIGN_KEY"
+	CodeNotNull              = "ERR_NOT_NULL"
+	CodeCheck                = "ERR_CHECK"
+	CodeSerializationFailure = "ERR_SERIALIZATION_FAILURE"
 )
 
 type ErrorDecoder interface {
