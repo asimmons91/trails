@@ -13,12 +13,15 @@ type ddlColumn struct {
 	spec   dialect.ColumnSpec
 }
 
+// CreateTableBuilder builds a CREATE TABLE statement, one column at a
+// time. Build one with CreateTable.
 type CreateTableBuilder struct {
 	table       Table
 	ifNotExists bool
 	columns     []ddlColumn
 }
 
+// CreateTable starts a CreateTableBuilder for t.
 func CreateTable(t Table) *CreateTableBuilder {
 	return &CreateTableBuilder{table: t}
 }
@@ -29,18 +32,28 @@ func (b *CreateTableBuilder) clone() *CreateTableBuilder {
 	return &nb
 }
 
+// IfNotExists adds IF NOT EXISTS, making the statement a no-op instead of
+// an error if the table already exists.
 func (b *CreateTableBuilder) IfNotExists() *CreateTableBuilder {
 	nb := b.clone()
 	nb.ifNotExists = true
 	return nb
 }
 
+// Column adds one column (of Go type goType, with the constraints/default
+// in spec) to the table, in the order Column is called. A primary-key
+// column that the dialect doesn't inline into its own definition (see
+// dialect.DDL.InlinesPrimaryKey) instead gets a trailing table-level
+// PRIMARY KEY constraint listing every such column.
 func (b *CreateTableBuilder) Column(name string, goType reflect.Type, spec dialect.ColumnSpec) *CreateTableBuilder {
 	nb := b.clone()
 	nb.columns = append(nb.columns, ddlColumn{name: name, goType: goType, spec: spec})
 	return nb
 }
 
+// Render renders b as CREATE TABLE SQL for dialect d, via its
+// dialect.DDL.ColumnDefinition. It errors with ErrDDLUnsupportedByDialect
+// if d doesn't implement dialect.DDL.
 func (b *CreateTableBuilder) Render(d dialect.Dialect) (string, []any, error) {
 	ddl, ok := d.(dialect.DDL)
 	if !ok {

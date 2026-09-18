@@ -6,8 +6,10 @@ import (
 	"github.com/asimmons91/trails/pack/dialect"
 )
 
+// ColumnType is a column's introspected shape, as returned by ColumnTypes.
 type ColumnType = dialect.ColumnMeta
 
+// GetTables returns the names of every table in the current database.
 func (m *Migrator) GetTables(ctx context.Context) ([]string, error) {
 	sqlText, args := m.ddl.GetTablesSQL()
 
@@ -29,6 +31,9 @@ func (m *Migrator) GetTables(ctx context.Context) ([]string, error) {
 	return out, rows.Err()
 }
 
+// ColumnTypes returns the actual, current column shapes of dst's table as
+// the database reports them — useful for verifying a migration's effect
+// rather than trusting the Go-side struct tags.
 func (m *Migrator) ColumnTypes(ctx context.Context, dst any) ([]ColumnType, error) {
 	table := schemaForOrPanic(dst)
 	sqlText, args := m.ddl.ColumnTypesSQL(table.Name)
@@ -51,6 +56,8 @@ func (m *Migrator) ColumnTypes(ctx context.Context, dst any) ([]ColumnType, erro
 	return out, rows.Err()
 }
 
+// CurrentDatabase returns the name of the database the Migrator is
+// connected to, or "" if the dialect doesn't report one.
 func (m *Migrator) CurrentDatabase(ctx context.Context) (string, error) {
 	sqlText := m.ddl.CurrentDatabaseSQL()
 

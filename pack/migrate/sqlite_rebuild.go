@@ -12,6 +12,12 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// AlterColumn changes dst's field (a Go struct field name) to match its
+// current struct-tag type/spec. It tries DDL.AlterColumnSQL first; if the
+// dialect can't alter a column in place (SQLite, always — see
+// dialect.ErrRequiresTableRebuild), it falls back to a full table rebuild
+// via alterColumnViaRebuild, which requires a top-level *pack.DB (see
+// ErrAlterColumnRequiresTopLevelConnection).
 func (m *Migrator) AlterColumn(ctx context.Context, dst any, field string) error {
 	table := schemaForOrPanic(dst)
 	f := fieldByGoNameOrPanic(table, field)
@@ -28,6 +34,15 @@ func (m *Migrator) AlterColumn(ctx context.Context, dst any, field string) error
 	return err
 }
 
+// alterColumnViaRebuild is SQLite's ALTER-column fallback: since SQLite
+// can't alter a column's type/constraints in place, it pins a single
+// connection (required so the PRAGMA toggles below apply to the same
+// connection the rebuild runs on), turns off foreign-key enforcement,
+// rebuilds table inside one transaction (see rebuildTable), then re-checks
+// referential integrity via PRAGMA foreign_key_check before turning
+// enforcement back on — failing with ErrForeignKeyCheckFailed if the
+// rebuild broke any foreign key. It refuses to run inside an
+// already-open transaction, since it manages its own.
 func (m *Migrator) alterColumnViaRebuild(ctx context.Context, table *schema.Table) error {
 	if m.db.InTransaction() {
 		return ErrAlterColumnRequiresTopLevelConnection
@@ -61,6 +76,13 @@ func (m *Migrator) alterColumnViaRebuild(ctx context.Context, table *schema.Tabl
 	})
 }
 
+// rebuildTable replaces table with a fresh copy matching its current
+// (already-altered in Go) struct tags: it captures the existing index SQL,
+// creates a "<table>__pack_rebuild" shadow table with the new column
+// shapes, copies every row across via INSERT ... SELECT, drops the
+// original and renames the shadow into its place, then replays the
+// captured index SQL against the renamed table. Must run inside a
+// transaction (see alterColumnViaRebuild).
 func rebuildTable(ctx context.Context, tx *pack.DB, table *schema.Table) error {
 	indexSQL, err := captureIndexSQL(ctx, tx, table.Name)
 	if err != nil {
@@ -117,6 +139,9 @@ func rebuildTable(ctx context.Context, tx *pack.DB, table *schema.Table) error {
 	return nil
 }
 
+// captureIndexSQL returns the CREATE INDEX statements SQLite used to build
+// table's existing indexes (from sqlite_master), so rebuildTable can
+// replay them against the rebuilt table.
 func captureIndexSQL(ctx context.Context, tx *pack.DB, table string) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, "Raw", "",
 		"SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ?1 AND sql IS NOT NULL",
@@ -138,6 +163,9 @@ func captureIndexSQL(ctx context.Context, tx *pack.DB, table string) ([]string, 
 	return out, rows.Err()
 }
 
+// scanForeignKeyCheckRows scans PRAGMA foreign_key_check's result set
+// (whose columns vary, so it scans generically by name) into one map per
+// violation row.
 func scanForeignKeyCheckRows(rows *sql.Rows) ([]map[string]any, error) {
 	defer func() { _ = rows.Close() }()
 
@@ -167,6 +195,7 @@ func scanForeignKeyCheckRows(rows *sql.Rows) ([]map[string]any, error) {
 	return out, rows.Err()
 }
 
+// quoteJoin quotes each of names as an identifier and joins them with ", ".
 func quoteJoin(d dialect.Dialect, names []string) string {
 	parts := make([]string, len(names))
 	for i, n := range names {

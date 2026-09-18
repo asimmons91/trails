@@ -71,8 +71,12 @@ func (d Postgres) ColumnDefinition(t reflect.Type, spec dialect.ColumnSpec) (str
 	return def, nil
 }
 
+// InlinesPrimaryKey is always false; Postgres writes a primary key as a
+// separate table-level constraint, never inline in the column definition.
 func (Postgres) InlinesPrimaryKey(dialect.ColumnSpec) bool { return false }
 
+// AlterColumnSQL renders one ALTER TABLE statement combining a type
+// change, a NOT NULL/DROP NOT NULL, and a SET/DROP DEFAULT action.
 func (d Postgres) AlterColumnSQL(table, column string, t reflect.Type, spec dialect.ColumnSpec) (string, error) {
 	sqlType := spec.SQLType
 	if sqlType == "" {
@@ -109,34 +113,44 @@ func (d Postgres) AlterColumnSQL(table, column string, t reflect.Type, spec dial
 	return sql, nil
 }
 
+// DropIndexSQL implements dialect.DDL.
 func (d Postgres) DropIndexSQL(_, index string) string {
 	return "DROP INDEX " + d.QuoteIdent(index)
 }
 
+// RenameIndexSQL renders an ALTER INDEX ... RENAME TO statement; unlike
+// most dialects, Postgres addresses an index by name alone, so the table
+// argument is unused.
 func (d Postgres) RenameIndexSQL(_, oldName, newName string) (string, error) {
 	return "ALTER INDEX " + d.QuoteIdent(oldName) + " RENAME TO " + d.QuoteIdent(newName), nil
 }
 
+// HasTableSQL implements dialect.DDL, scoped to the current schema.
 func (Postgres) HasTableSQL(table string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = $1)", []any{table}
 }
 
+// HasColumnSQL implements dialect.DDL, scoped to the current schema.
 func (Postgres) HasColumnSQL(table, column string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2)", []any{table, column}
 }
 
+// HasIndexSQL implements dialect.DDL, scoped to the current schema.
 func (Postgres) HasIndexSQL(table, index string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND tablename = $1 AND indexname = $2)", []any{table, index}
 }
 
+// HasConstraintSQL implements dialect.DDL, scoped to the current schema.
 func (Postgres) HasConstraintSQL(table, name string) (string, []any) {
 	return "SELECT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_schema = current_schema() AND table_name = $1 AND constraint_name = $2)", []any{table, name}
 }
 
+// GetTablesSQL implements dialect.DDL, scoped to the current schema.
 func (Postgres) GetTablesSQL() (string, []any) {
 	return "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() ORDER BY table_name", nil
 }
 
+// ColumnTypesSQL implements dialect.DDL, scoped to the current schema.
 func (Postgres) ColumnTypesSQL(table string) (string, []any) {
 	return `SELECT c.column_name, c.data_type, (c.is_nullable = 'YES') AS nullable,
 		EXISTS (
@@ -151,4 +165,5 @@ func (Postgres) ColumnTypesSQL(table string) (string, []any) {
 		ORDER BY c.ordinal_position`, []any{table}
 }
 
+// CurrentDatabaseSQL returns the current database's name.
 func (Postgres) CurrentDatabaseSQL() string { return "SELECT current_database()" }

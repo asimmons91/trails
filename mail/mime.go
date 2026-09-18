@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// BuildRFC822 encodes msg into a raw RFC 822 message: multipart/alternative
+// when both HTML and Text are set, a single text/html or text/plain part
+// when only one is, and an error when neither is set. Headers are written
+// in sorted order for deterministic output.
 func BuildRFC822(msg *Message) ([]byte, error) {
 	if msg.HTML == "" && msg.Text == "" {
 		return nil, fmt.Errorf("mail: message has neither an HTML nor a text body")
@@ -52,6 +56,8 @@ func BuildRFC822(msg *Message) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
+// buildBody picks msg's body encoding: a multipart/alternative envelope
+// when both HTML and Text are set, otherwise whichever single one is.
 func buildBody(msg *Message) ([]byte, string, error) {
 	switch {
 	case msg.HTML != "" && msg.Text != "":

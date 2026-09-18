@@ -7,18 +7,25 @@ import (
 	"sync/atomic"
 )
 
+// TransactionFunc is the callback DB.Tx runs inside a transaction.
 type TransactionFunc func(tx *DB) error
 
+// txScope abstracts committing/rolling back a transaction, whether it's a
+// root *sql.Tx (rootTxScope) or a nested SAVEPOINT (savepointScope).
 type txScope interface {
 	commit(ctx context.Context) error
 	rollback(ctx context.Context) error
 }
 
+// rootTxScope commits/rolls back a top-level *sql.Tx, returned by BeginTx
+// when the DB wasn't already inside a transaction.
 type rootTxScope struct{ tx *sql.Tx }
 
 func (s rootTxScope) commit(ctx context.Context) error   { return s.tx.Commit() }
 func (s rootTxScope) rollback(ctx context.Context) error { return s.tx.Rollback() }
 
+// savepointScope commits/rolls back a nested SAVEPOINT, returned by
+// BeginTx when the DB was already inside a transaction.
 type savepointScope struct {
 	db   *DB
 	name string
@@ -34,6 +41,9 @@ func (s savepointScope) rollback(ctx context.Context) error {
 	return err
 }
 
+// Tx runs fn inside a transaction (via BeginTx), committing if fn returns
+// nil and rolling back otherwise. A panic inside fn also rolls back, then
+// re-panics.
 func (db *DB) Tx(ctx context.Context, fn TransactionFunc) error {
 	return db.txWithOptions(ctx, nil, fn)
 }
@@ -59,6 +69,14 @@ func (db *DB) txWithOptions(ctx context.Context, opts *sql.TxOptions, fn Transac
 	return txDB.Commit()
 }
 
+// BeginTx starts a transaction and returns a *DB scoped to it — pass it to
+// the same query/write functions as any other DB. If db is a root
+// connection, this starts a top-level *sql.Tx. If db is already inside a
+// transaction (itself the result of BeginTx), this instead creates a
+// nested SAVEPOINT, requiring dialect.Dialect.SupportsSavepoints; the
+// returned *DB's Commit/Rollback then release or roll back to that
+// savepoint rather than ending the outer transaction. Pair with
+// Commit/Rollback, or use Tx to handle that automatically.
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*DB, error) {
 	if db.beginner != nil {
 		tx, err := db.beginner.BeginTx(ctx, opts)
@@ -85,6 +103,9 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*DB, error) {
 	return nested, nil
 }
 
+// Commit commits the transaction db was returned by BeginTx as — a plain
+// commit for a root transaction, or RELEASE SAVEPOINT for a nested one.
+// Errors if db isn't a *DB BeginTx returned.
 func (db *DB) Commit() error {
 	if db.scope == nil {
 		return fmt.Errorf("pack: Commit: db is not a transaction returned by BeginTx")
@@ -93,6 +114,9 @@ func (db *DB) Commit() error {
 	return db.scope.commit(context.Background())
 }
 
+// Rollback rolls back the transaction db was returned by BeginTx as — a
+// plain rollback for a root transaction, or ROLLBACK TO SAVEPOINT for a
+// nested one. Errors if db isn't a *DB BeginTx returned.
 func (db *DB) Rollback() error {
 	if db.scope == nil {
 		return fmt.Errorf("pack: Rollback: db is not a transaction returned by BeginTx")
@@ -101,10 +125,20 @@ func (db *DB) Rollback() error {
 	return db.scope.rollback(context.Background())
 }
 
+// InTransaction reports whether db was returned by BeginTx (root or
+// nested savepoint).
 func (db *DB) InTransaction() bool {
 	return db.scope != nil
 }
 
+// PinnedConn runs fn against a *DB pinned to a single underlying
+// connection for fn's duration, released afterward. Use it for operations
+// that must all run on the same connection outside of pooling — e.g.
+// pack/migrate's SQLite table-rebuild, which needs a session-scoped PRAGMA
+// plus a transaction on that same connection. Only a root DB (from Open
+// or Connect) supports pinning; calling PinnedConn on a DB already
+// returned by BeginTx or PinnedConn itself returns
+// ErrPinnedConnUnsupported.
 func (db *DB) PinnedConn(ctx context.Context, fn func(pinned *DB) error) error {
 	pool, ok := db.beginner.(interface {
 		Conn(ctx context.Context) (*sql.Conn, error)

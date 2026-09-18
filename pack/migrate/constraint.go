@@ -8,6 +8,12 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// CreateConstraint creates a foreign-key constraint on dst's table for its
+// belongs_to relation named relationName (only belongs_to is supported —
+// see ErrConstraintWrongRelationKind — since that's the side the FK column
+// lives on). The referenced column defaults to the target's single-column
+// primary key, and the constraint name defaults to "fk_<table>_<fk
+// column>"; both can be overridden via opts.
 func (m *Migrator) CreateConstraint(ctx context.Context, dst any, relationName string, opts ...ConstraintOption) error {
 	table := schemaForOrPanic(dst)
 
@@ -51,6 +57,9 @@ func (m *Migrator) CreateConstraint(ctx context.Context, dst any, relationName s
 	return err
 }
 
+// DropConstraint drops the named constraint from dst's table. It's a no-op
+// if the constraint doesn't already exist, unless opts includes
+// WithoutIfExists.
 func (m *Migrator) DropConstraint(ctx context.Context, dst any, name string, opts ...DropOption) error {
 	table := schemaForOrPanic(dst)
 	cfg := applyDropOptions(opts)
@@ -73,6 +82,7 @@ func (m *Migrator) DropConstraint(ctx context.Context, dst any, name string, opt
 	return err
 }
 
+// HasConstraint reports whether the named constraint exists on dst's table.
 func (m *Migrator) HasConstraint(ctx context.Context, dst any, name string) (bool, error) {
 	table := schemaForOrPanic(dst)
 	sqlText, args := m.ddl.HasConstraintSQL(table.Name, name)

@@ -5,6 +5,11 @@ import (
 	"unicode"
 )
 
+// toSnakeCase is the default column/FK-name derivation from a Go
+// identifier: a new word boundary (and thus an inserted "_") starts at an
+// uppercase rune following a lowercase or digit, or at the last uppercase
+// rune of a run that's followed by a lowercase one (so "UserID" ->
+// "user_id", not "user_i_d").
 func toSnakeCase(s string) string {
 	if s == "" {
 		return s

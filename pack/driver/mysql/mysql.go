@@ -1,3 +1,5 @@
+// Package mysql implements driver.Driver and driver.ErrorDecoder for
+// MySQL, via github.com/go-sql-driver/mysql.
 package mysql
 
 import (
@@ -10,22 +12,30 @@ import (
 	sqlmysql "github.com/go-sql-driver/mysql"
 )
 
+// Driver implements driver.Driver and driver.ErrorDecoder for MySQL.
 type Driver struct{}
 
 var _ driver.Driver = Driver{}
 
+// New returns a MySQL Driver.
 func New() Driver { return Driver{} }
 
+// Name returns "mysql".
 func (Driver) Name() string { return "mysql" }
 
+// Open opens dsn via the go-sql-driver/mysql driver.
 func (Driver) Open(dsn string) (*sql.DB, error) {
 	return sql.Open("mysql", dsn)
 }
 
+// Dialect returns a mysqldialect.MySQL.
 func (Driver) Dialect() dialect.Dialect { return mysqldialect.New() }
 
 var _ driver.ErrorDecoder = Driver{}
 
+// Classify maps a *mysql.MySQLError's error number to a driver.Code*
+// constant, per the table below; any other error, or a non-MySQL error,
+// returns ok=false.
 func (Driver) Classify(err error) (string, bool) {
 	var me *sqlmysql.MySQLError
 	if !errors.As(err, &me) {

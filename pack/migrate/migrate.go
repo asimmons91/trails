@@ -1,3 +1,8 @@
+// Package migrate is an imperative, Go-driven schema migration API on top
+// of pack.DB and dialect.DDL: define versioned Migrations that call
+// *Migrator methods (CreateTable, AddColumn, AlterColumn, ...), Register
+// them — typically from an init() in a generated migrations package — and
+// drive them with Up and Down.
 package migrate
 
 import (
@@ -10,6 +15,8 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// Migrator issues DDL against db, resolving the dialect.DDL implementation
+// to use for it via New.
 type Migrator struct {
 	db  *pack.DB
 	ddl dialect.DDL
@@ -54,6 +61,8 @@ func (m *Migrator) CreateTable(ctx context.Context, dst ...any) error {
 	return nil
 }
 
+// DropTable drops dst's table. It's a no-op if the table doesn't already
+// exist, unless opts includes WithoutIfExists.
 func (m *Migrator) DropTable(ctx context.Context, dst any, opts ...DropOption) error {
 	table := schemaForOrPanic(dst)
 	cfg := applyDropOptions(opts)
@@ -95,6 +104,9 @@ func (m *Migrator) RenameTable(ctx context.Context, dst any, newName string) err
 	return err
 }
 
+// queryExists runs sqlText, a query expected to return a single boolean
+// row (e.g. an information-schema existence check), and returns that
+// value — false if the query returns no rows.
 func (m *Migrator) queryExists(ctx context.Context, op, model, sqlText string, args []any) (bool, error) {
 	rows, err := m.db.QueryContext(ctx, op, model, sqlText, args)
 	if err != nil {

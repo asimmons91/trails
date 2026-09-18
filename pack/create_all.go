@@ -9,10 +9,23 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// defaultCreateAllBatchSize is how many rows CreateAll inserts per
+// statement unless overridden by WithBatchSize.
 const defaultCreateAllBatchSize = 1000
 
+// maxPostgresParams caps CreateAll's batch size so a single multi-row
+// INSERT never exceeds Postgres's bound-parameter limit, regardless of
+// WithBatchSize.
 const maxPostgresParams = 65535
 
+// CreateAll inserts rows in batches (WithBatchSize, default
+// defaultCreateAllBatchSize rows, further capped so Postgres's parameter
+// limit is never exceeded), one multi-row INSERT per batch, firing
+// before/after-insert hooks per row if T implements them. Like Create, it
+// backfills auto-increment/defaulted columns onto each row afterward —
+// via a single RETURNING clause per batch where the dialect supports it,
+// or createAllWithoutReturning otherwise. Returns ErrZeroCompositeKey if
+// any row has a composite primary key still at its zero value.
 func CreateAll[T any](ctx context.Context, db *DB, rows []*T, opts ...WriteOption) error {
 	if len(rows) == 0 {
 		return nil
@@ -147,6 +160,13 @@ func CreateAll[T any](ctx context.Context, db *DB, rows []*T, opts ...WriteOptio
 	return nil
 }
 
+// createAllWithoutReturning is CreateAll's fallback for a dialect without
+// RETURNING support: it inserts the batch, then backfills each row's
+// auto-increment field from a single LastInsertId, relying on the
+// database allocating a contiguous block of ids for a multi-row INSERT
+// (true for MySQL and SQLite) so row i's id is firstID+i. It does not
+// handle non-auto-increment defaulted columns — those dialects are
+// expected to support RETURNING instead.
 func createAllWithoutReturning[T any](ctx context.Context, db *DB, table *schema.Table, ib *sqlbuild.InsertBuilder, chunkRows []*T, returningFields []schema.Field) error {
 	sqlText, args, err := ib.Render(db.dialect)
 	if err != nil {
@@ -175,6 +195,8 @@ func createAllWithoutReturning[T any](ctx context.Context, db *DB, table *schema
 	return nil
 }
 
+// scanCreateAllReturning scans one RETURNING row per chunkRows entry, in
+// the same order the batch was inserted, into each row's returningFields.
 func scanCreateAllReturning[T any](ctx context.Context, db *DB, table *schema.Table, sqlText string, args []any, chunkRows []*T, returningFields []schema.Field) error {
 	rows, err := db.queryContext(ctx, "CreateAll", table.GoType.Name(), sqlText, args)
 	if err != nil {

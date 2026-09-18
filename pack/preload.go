@@ -11,6 +11,9 @@ import (
 
 type preloadRunner func(ctx context.Context, db *DB, parentsAny any) error
 
+// PreloadOption configures one relation preload, passed to Query[T].Preload
+// or the Preload option function. Build one with Where or Preload
+// (nesting a preload inside another).
 type PreloadOption interface {
 	applyTo(spec *preloadSpec)
 }
@@ -28,6 +31,9 @@ func (o whereOption) applyTo(s *preloadSpec) {
 	s.where = andJoin(s.where, o.p)
 }
 
+// Where scopes a preload's own query — unlike Query[T].Where, which
+// filters the outer query, this filters which related rows get loaded
+// (e.g. Preload(accountRel.Posts, Where(postCol.Published.Eq(true)))).
 func Where(p Predicate) PreloadOption {
 	return whereOption(p)
 }
@@ -36,6 +42,11 @@ type nestedOption struct{ run preloadRunner }
 
 func (o nestedOption) applyTo(s *preloadSpec) { s.nested = append(s.nested, o.run) }
 
+// Preload is a PreloadOption that nests a second-level preload inside a
+// first: pass it to another Preload/Query[T].Preload call's opts to load a
+// relation of the relation, e.g. Query[T].Preload(accountRel.Posts,
+// Preload(postRel.Comments)). This is distinct from Query[T].Preload, the
+// chain method that starts a top-level preload on a query.
 func Preload[T, U any](rel Rel[T, U], opts ...PreloadOption) PreloadOption {
 	spec := &preloadSpec{}
 	for _, o := range opts {
@@ -48,6 +59,11 @@ func Preload[T, U any](rel Rel[T, U], opts ...PreloadOption) PreloadOption {
 	return nestedOption{run}
 }
 
+// Preload adds rel as a relation to batch-load after the outer query
+// runs, avoiding N+1 queries: one follow-up query fetches every related
+// row across all results in a single IN (...), rather than one query per
+// parent row. This is distinct from the Preload option function, which
+// nests a second relation inside this one.
 func (q *Query[T]) Preload[U any](rel Rel[T, U], opts ...PreloadOption) *Query[T] {
 	spec := &preloadSpec{}
 	for _, o := range opts {
@@ -63,6 +79,11 @@ func (q *Query[T]) Preload[U any](rel Rel[T, U], opts ...PreloadOption) *Query[T
 	return nq
 }
 
+// resolveRefColumn returns rel's referenced column — rel.Ref if the tag
+// set one explicitly, otherwise the owning side's single-column primary
+// key (the owner for a has-many/has-one, the target for a belongs-to).
+// Errors if that side's key is composite or missing, since there's no
+// single column to default to.
 func resolveRefColumn(rel *schema.Relation, ownerTable, targetTable *schema.Table) (string, error) {
 	if rel.Ref != "" {
 		return rel.Ref, nil
@@ -83,6 +104,12 @@ func resolveRefColumn(rel *schema.Relation, ownerTable, targetTable *schema.Tabl
 	return table.PK[0].Column, nil
 }
 
+// runPreload loads rel for every row in parents with one batched query:
+// it collects the distinct join keys across all of parents, fetches every
+// matching U row via a single WHERE ... IN (...) (optionally narrowed by
+// spec.where), runs any nested preloads on those children, then assigns
+// each parent's matching children (or single child, for a non-slice
+// relation) back onto its relation field in place.
 func runPreload[T, U any](ctx context.Context, db *DB, parents []T, rel Rel[T, U], spec *preloadSpec) error {
 	if len(parents) == 0 {
 		return nil

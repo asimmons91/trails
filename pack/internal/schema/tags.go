@@ -2,6 +2,8 @@ package schema
 
 import "strings"
 
+// FieldKind says whether a parsed `db:"..."` tag describes a column or a
+// relation.
 type FieldKind int
 
 const (
@@ -9,6 +11,7 @@ const (
 	KindRelation
 )
 
+// RelationKind is the kind of relation a `db:"rel:<kind>"` tag names.
 type RelationKind int
 
 const (
@@ -17,6 +20,8 @@ const (
 	HasMany
 )
 
+// String renders a RelationKind as it appears in tag syntax and error
+// messages ("belongs_to", "has_one", "has_many").
 func (r RelationKind) String() string {
 	switch r {
 	case BelongsTo:
@@ -30,32 +35,54 @@ func (r RelationKind) String() string {
 	}
 }
 
+// ColumnOptions are the parsed option flags from a column tag, e.g.
+// `db:"email,unique,not_null"`.
 type ColumnOptions struct {
 	PK            bool
 	AutoIncrement bool
-	NullZero      bool
-	Unique        bool
-	NotNull       bool
-	Default       string
-	HasDefault    bool
-	SQLType       string
-	Skip          bool
+	// NullZero treats the field's zero value as SQL NULL on write.
+	NullZero   bool
+	Unique     bool
+	NotNull    bool
+	Default    string
+	HasDefault bool
+	// SQLType overrides the column's inferred SQL type, from a `type:`
+	// option.
+	SQLType string
+	// Skip marks a field excluded from the table entirely, from a `db:"-"`
+	// tag.
+	Skip bool
 }
 
+// RelationOptions are the parsed options from a relation tag, e.g.
+// `db:"rel:belongs_to,fk:author_id"`.
 type RelationOptions struct {
 	Kind RelationKind
-	FK   string
-	Ref  string
+	// FK and Ref are the foreign-key and referenced-key column names. Left
+	// empty, resolveRelationFKs fills FK in by convention.
+	FK  string
+	Ref string
 }
 
+// ParsedTag is the result of parsing one field's `db:"..."` tag: either a
+// column (Column populated, Kind == KindColumn) or a relation (Relation
+// populated, Kind == KindRelation) — never both.
 type ParsedTag struct {
-	Kind            FieldKind
-	Column          ColumnOptions
-	Relation        RelationOptions
-	NameSlot        string
+	Kind     FieldKind
+	Column   ColumnOptions
+	Relation RelationOptions
+	// NameSlot is the column tag's leading name element (e.g. "email" in
+	// `db:"email,unique"`), empty if left blank for the default
+	// snake_case name.
+	NameSlot string
+	// HasLeadingComma is true for a deliberately empty NameSlot
+	// (`db:",unique"`), distinguishing "use the default name" from "the
+	// name slot happened to be empty."
 	HasLeadingComma bool
 }
 
+// StructOptions are the parsed options from a struct-level tag on an
+// embedded field, e.g. `db:"table:users,alias:u"`.
 type StructOptions struct {
 	Table    string
 	HasTable bool
@@ -73,6 +100,13 @@ var bareColumnOptions = map[string]bool{
 
 var prefixColumnOptions = []string{"default:", "type:", "fk:", "ref:"}
 
+// ParseFieldTag parses one struct field's `db:"..."` tag value raw into a
+// ParsedTag. `db:"-"` skips the field entirely. A tag whose first
+// comma-separated element starts with "rel:" is parsed as a relation
+// (`db:"rel:<kind>[,fk:...][,ref:...]"`); anything else is parsed as a
+// column (`db:"[name][,opt]..."`, options from bareColumnOptions or a
+// `default:`/`type:` prefix). "rel:" is only recognized as the tag's first
+// element — found elsewhere, it's an error (ErrMisplacedRelPrefix).
 func ParseFieldTag(structName, fieldName, raw string) (ParsedTag, error) {
 	if raw == "-" {
 		return ParsedTag{Kind: KindColumn, Column: ColumnOptions{Skip: true}}, nil
@@ -94,6 +128,11 @@ func ParseFieldTag(structName, fieldName, raw string) (ParsedTag, error) {
 	return parseColumnTag(structName, fieldName, raw, elems)
 }
 
+// ParseStructTag parses the `db:"..."` tag value raw found on an embedded
+// field into a StructOptions, recognizing only `table:` and `alias:`.
+// Any column- or relation-only option in raw is an error
+// (ErrFieldOptionOnStructTag), as is anything unrecognized
+// (ErrUnknownOption).
 func ParseStructTag(structName, raw string) (StructOptions, error) {
 	var opts StructOptions
 	if raw == "" {

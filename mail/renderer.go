@@ -10,7 +10,12 @@ import (
 	texttemplate "text/template"
 )
 
+// Renderer renders a named mail template to an HTML body and, if one
+// exists, a plain-text body. NewRenderer builds the only implementation.
 type Renderer interface {
+	// Render renders name — "<mailer-dir>/<action>", e.g.
+	// "user_mailer/welcome_email" — with data, returning the HTML body and,
+	// if a sibling text template exists, the plain-text body.
 	Render(name string, data any) (html string, text string, err error)
 }
 
@@ -22,6 +27,22 @@ type renderer struct {
 
 const textSuffix = ".text.gohtml"
 
+// NewRenderer builds a Renderer from viewFS, a directory tree structured
+// as:
+//
+//   - layouts/*.gohtml — one file per layout; the one named layoutName
+//     (without its extension) wraps every rendered action via
+//     ExecuteTemplate. Files in layouts/ whose name starts with "_" are
+//     shared partials, parsed into every action alongside the layout.
+//   - <mailer>/<action>.gohtml — one subdirectory per "mailer", one file
+//     per action; defines the "content" template the layout wraps. A file
+//     here starting with "_" is a partial shared by every action in that
+//     mailer directory instead.
+//   - <mailer>/<action>.text.gohtml — optional sibling of an action file,
+//     parsed as a plain text/template for that action's Text body. An
+//     action with no sibling renders with an empty Text.
+//
+// A resulting Render name is "<mailer>/<action>".
 func NewRenderer(viewFS fs.FS, layoutName string, funcMap template.FuncMap) (Renderer, error) {
 	layoutMatches, err := fs.Glob(viewFS, "layouts/*.gohtml")
 	if err != nil {

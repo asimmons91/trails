@@ -40,6 +40,12 @@ func (r *renderer) quoteTable(t Table) string {
 
 var rawPlaceholderRE = regexp.MustCompile(`\$([0-9]+)`)
 
+// renderRawFragment rewrites fragment's own "$1", "$2", ... placeholders
+// (always this syntax, regardless of dialect) into the dialect's actual
+// placeholder syntax and position — offset by whatever's already been
+// bound via r.bind — then appends rawArgs to r.args in order. It errors
+// with ErrRawPlaceholderOutOfRange if fragment references a placeholder
+// index with no matching rawArgs entry.
 func (r *renderer) renderRawFragment(fragment string, rawArgs []any) (string, error) {
 	base := len(r.args)
 

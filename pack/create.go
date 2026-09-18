@@ -9,6 +9,13 @@ import (
 	"github.com/asimmons91/trails/pack/internal/sqlbuild"
 )
 
+// Create inserts row, firing a BeforeInsert hook first (if T implements
+// one) and an AfterInsert hook last (if implemented). Any auto-increment
+// or defaulted column left at its zero value is backfilled onto row after
+// the insert, via RETURNING where the dialect supports it (see
+// createWithoutReturning otherwise). Returns ErrZeroCompositeKey if T has
+// a composite primary key still at its zero value — composite keys are
+// never server-generated.
 func Create[T any](ctx context.Context, db *DB, row *T, opts ...WriteOption) error {
 	t := reflect.TypeFor[T]()
 	table, err := schema.For(t)
@@ -113,6 +120,11 @@ func Create[T any](ctx context.Context, db *DB, row *T, opts ...WriteOption) err
 	return fireAfterInsert(ctx, table, row)
 }
 
+// createWithoutReturning is Create's fallback for a dialect without
+// RETURNING support (see dialect.Dialect.SupportsReturning): it inserts
+// row, pulls an auto-increment id via sql.Result.LastInsertId, and — if
+// any other defaulted column still needs a value — runs a follow-up
+// SELECT keyed by the primary key to fetch the rest.
 func createWithoutReturning(ctx context.Context, db *DB, table *schema.Table, ib *sqlbuild.InsertBuilder, rv reflect.Value, row any, returning []schema.Field) error {
 	sqlText, args, err := ib.Render(db.dialect)
 	if err != nil {
@@ -184,6 +196,8 @@ func createWithoutReturning(ctx context.Context, db *DB, table *schema.Table, ib
 	return fireAfterInsert(ctx, table, row)
 }
 
+// fireAfterInsert calls row's AfterInsert hook if table's model implements
+// one.
 func fireAfterInsert(ctx context.Context, table *schema.Table, row any) error {
 	if !table.Hooks.AfterInsert {
 		return nil
@@ -202,6 +216,10 @@ func fireAfterInsert(ctx context.Context, table *schema.Table, row any) error {
 	return nil
 }
 
+// returningDest picks the address to scan a generated value for field f
+// into: f's own struct field, except for the primary key, which — if row
+// implements pkAddressable (i.e. embeds Model[ID]) — is written through
+// that interface instead.
 func returningDest(row any, rv reflect.Value, f schema.Field) any {
 	if f.Options.PK {
 		if pa, ok := row.(pkAddressable); ok {

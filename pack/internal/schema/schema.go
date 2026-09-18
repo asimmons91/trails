@@ -1,3 +1,9 @@
+// Package schema reflects a pack model struct, once, into a Table: its
+// columns, primary key, relations, and which lifecycle hooks it implements
+// — the struct-tag-parsing core every other pack package builds queries
+// against. For builds a Table from a Go type by walking its fields and
+// parsing their `db:"..."` tags (see ParseFieldTag/ParseStructTag); the
+// result is cached, so repeated calls for the same type are free.
 package schema
 
 import (
@@ -10,29 +16,45 @@ import (
 	"time"
 )
 
+// Field describes one mapped struct field: its Go name, DB column, and
+// parsed tag Options.
 type Field struct {
-	GoName  string
-	Column  string
-	Index   []int // for reflect.Value.FieldByIndex. Prevents looking up by name in hot path
+	GoName string
+	Column string
+	// Index locates the field via reflect.Value.FieldByIndex, avoiding a
+	// by-name lookup on the hot scan path.
+	Index   []int
 	Type    reflect.Type
 	Options ColumnOptions
 }
 
+// Relation describes one mapped relation field (belongs_to/has_one/
+// has_many): its Go name, kind, target model type, and the FK/Ref column
+// pair joining it to its target.
 type Relation struct {
-	GoName     string
-	Index      []int
-	Kind       RelationKind
+	GoName string
+	Index  []int
+	Kind   RelationKind
+	// TargetType is the related model's Go type (the pointer/slice-element
+	// type, not the field's own declared type).
 	TargetType reflect.Type
-	Slice      bool
-	FK         string
-	Ref        string
+	// Slice is true for a has_many field ([]*TargetType); false for
+	// belongs_to/has_one (*TargetType).
+	Slice bool
+	FK    string
+	Ref   string
 }
 
+// Table is a model's reflected shape: its Fields, primary key, Relations,
+// and detected Hooks. Build one via For.
 type Table struct {
-	GoType         reflect.Type
-	Name           string
-	Alias          string
-	Fields         []Field
+	GoType reflect.Type
+	Name   string
+	Alias  string
+	Fields []Field
+	// FieldsByColumn indexes Fields by DB column name, for fast lookup by
+	// pack/internal/scan when mapping a result set's columns back to
+	// fields.
 	FieldsByColumn map[string]*Field
 	PK             []Field
 	PKIsComposite  bool
@@ -40,6 +62,9 @@ type Table struct {
 	Hooks          Hooks
 }
 
+// Hooks records which lifecycle hook interfaces (see package pack's
+// BeforeInserter et al.) a model implements, detected once by For and
+// cached on its Table.
 type Hooks struct {
 	BeforeInsert bool
 	AfterInsert  bool
@@ -83,6 +108,9 @@ var (
 
 var registry sync.Map // map[reflect.Type]func() (*Table, error)
 
+// For reflects t (dereferencing a pointer type) into a *Table, building it
+// once via build and caching the result keyed by type — later calls for
+// the same t return the cached Table (or error) without re-reflecting.
 func For(t reflect.Type) (*Table, error) {
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -107,6 +135,12 @@ func (b *buildCtx) fail(err error) {
 	b.errs = append(b.errs, err)
 }
 
+// build reflects t into a Table: walks its fields (walkFields), resolves
+// its table name and alias, expands any composite-key struct field into
+// its own Fields (expandCompositeKeys), fills in FK/Ref defaults left
+// implicit by a relation tag (resolveRelationFKs), and detects which
+// lifecycle hooks t implements. Errors are accumulated rather than
+// returned early, so a caller sees every tag mistake in one report.
 func build(t reflect.Type) (*Table, error) {
 	c := &buildCtx{structName: t.Name()}
 
@@ -145,6 +179,13 @@ func build(t reflect.Type) (*Table, error) {
 	return table, nil
 }
 
+// walkFields recursively flattens t's fields into table.Fields and
+// table.Relations: an anonymous (embedded) struct field is walked into
+// instead of becoming a Field itself, and its own `db:"..."` tag (if any)
+// supplies the struct-level options (table/alias) the first time one is
+// seen. Every other field becomes either a Relation (a `rel:` tag) or a
+// Field, named by its tag's NameSlot or, if empty, toSnakeCase of its Go
+// name.
 func walkFields(c *buildCtx, t reflect.Type, indexPrefix []int, table *Table, structOpts *StructOptions, haveStructOpts *bool) {
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
@@ -239,6 +280,10 @@ func tableNameFromMethod(t reflect.Type) (string, bool) {
 	return "", false
 }
 
+// expandCompositeKeys replaces any PK Field whose Go type is a flat scalar
+// struct (isCompositeKeyCandidate) with one Field per exported subfield of
+// that struct, setting table.PKIsComposite. A composite-key field itself
+// never appears in table.Fields — only its expanded parts do.
 func expandCompositeKeys(c *buildCtx, table *Table) {
 	var expaned []Field
 
@@ -368,6 +413,11 @@ func appendIndex(prefix []int, i int) []int {
 	return idx
 }
 
+// resolveRelationFKs fills in a Relation's FK when its tag left it
+// implicit: by convention, "<target>_id" for belongs_to (the FK lives on
+// this table, pointing at the target) and "<owner>_id" for has_one/
+// has_many (the FK lives on the target table, pointing back at this one).
+// A relation whose tag set an explicit fk: is left untouched.
 func resolveRelationFKs(table *Table) {
 	for i := range table.Relations {
 		rel := &table.Relations[i]

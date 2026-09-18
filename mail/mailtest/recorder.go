@@ -1,3 +1,6 @@
+// Package mailtest provides a mail.Transport test double: Recorder
+// records every message Send is given, and the Assert* helpers assert
+// against what's been recorded.
 package mailtest
 
 import (
@@ -12,15 +15,19 @@ type tHelper interface {
 	Helper()
 }
 
+// Recorder is a mail.Transport that records every message it's sent
+// instead of delivering it. Construct one with NewRecorder.
 type Recorder struct {
 	mu   sync.Mutex
 	sent []*mail.Message
 }
 
+// NewRecorder returns an empty, ready-to-use Recorder.
 func NewRecorder() *Recorder {
 	return &Recorder{}
 }
 
+// Send records msg (see Sent) and always returns nil.
 func (r *Recorder) Send(ctx context.Context, msg *mail.Message) error {
 	r.mu.Lock()
 	r.sent = append(r.sent, msg)

@@ -9,6 +9,8 @@ import (
 	"github.com/asimmons91/trails/pack/internal/schema"
 )
 
+// scanAllRows scans every row of rows into a T via internal/scan, firing
+// each result's AfterScan hook (if T implements one) before returning.
 func scanAllRows[T any](ctx context.Context, rows *sql.Rows, table *schema.Table) ([]T, error) {
 	cols, err := rows.Columns()
 	if err != nil {
@@ -34,6 +36,8 @@ func scanAllRows[T any](ctx context.Context, rows *sql.Rows, table *schema.Table
 	return result, nil
 }
 
+// scanOneRow scans the single next row of rows into a T, building a fresh
+// scan.Plan first (see scanOneWithPlan for reusing an existing one).
 func scanOneRow[T any](ctx context.Context, rows *sql.Rows, table *schema.Table) (T, error) {
 	var zero T
 	cols, err := rows.Columns()
@@ -44,6 +48,9 @@ func scanOneRow[T any](ctx context.Context, rows *sql.Rows, table *schema.Table)
 	return scanOneWithPlan[T](ctx, rows, scan.NewPlan(table, cols), table)
 }
 
+// scanOneWithPlan scans the single next row of rows into a T using an
+// already-built plan (so Query[T].Rows doesn't rebuild one per row),
+// firing its AfterScan hook if T implements one.
 func scanOneWithPlan[T any](ctx context.Context, rows *sql.Rows, plan *scan.Plan, table *schema.Table) (T, error) {
 	var zero T
 	row, err := scan.One[T](rows, plan)
