@@ -1,5 +1,4 @@
-// Package cors provides rack-cors/django-cors-headers-equivalent
-// cross-origin resource sharing support.
+// Package cors provides cross-origin resource sharing support.
 //
 // Register it with Router.Use/Trail.Use or scoped to a Group as usual, but
 // because trails registers routes against Go's http.ServeMux using
@@ -29,6 +28,7 @@ package cors
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -121,12 +121,7 @@ func newConfig(opts []Option) *config {
 }
 
 func slicesContains(ss []string, s string) bool {
-	for _, v := range ss {
-		if v == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ss, s)
 }
 
 func (cfg *config) matchOrigin(origin string) bool {

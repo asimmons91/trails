@@ -1,3 +1,7 @@
+// Package jobstest provides a jobs.Backend test double: Recorder records
+// what's enqueued instead of running it, and the Assert* helpers check
+// what was recorded. Use PerformEnqueued to actually run recorded jobs when
+// a test needs to observe their effects.
 package jobstest
 
 import (
@@ -13,6 +17,10 @@ type tHelper interface {
 	Helper()
 }
 
+// Recorder is a jobs.Backend that records each Enqueue call instead of
+// running it, so a test can assert on what would have been enqueued (via
+// the Assert* functions) and, when needed, run the recorded jobs later via
+// PerformEnqueued.
 type Recorder struct {
 	reg *jobs.Registry
 
@@ -20,10 +28,13 @@ type Recorder struct {
 	enqueued []jobs.Enqueued
 }
 
+// NewRecorder returns a Recorder that dispatches through reg when
+// PerformEnqueued is called.
 func NewRecorder(reg *jobs.Registry) *Recorder {
 	return &Recorder{reg: reg}
 }
 
+// Enqueue records e without running it. Satisfies jobs.Backend.
 func (r *Recorder) Enqueue(ctx context.Context, e jobs.Enqueued) error {
 	r.mu.Lock()
 	r.enqueued = append(r.enqueued, e)
@@ -31,6 +42,7 @@ func (r *Recorder) Enqueue(ctx context.Context, e jobs.Enqueued) error {
 	return nil
 }
 
+// Close is a no-op. Satisfies jobs.Backend.
 func (r *Recorder) Close() error { return nil }
 
 // Jobs returns a snapshot of everything recorded so far.

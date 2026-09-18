@@ -8,8 +8,7 @@ import (
 
 // SensitiveParams lists substrings (matched case-insensitively) that mark a
 // request parameter as sensitive. FilterParams replaces the value of any
-// key containing one of these with "[FILTERED]" — the same
-// substring-matching approach Rails' config.filter_parameters uses, so a
+// key containing one of these with "[FILTERED]", so a
 // single "password" entry also catches "user_password" and
 // "password_confirmation". Extend it in your app's init for any
 // app-specific secret-shaped param names.

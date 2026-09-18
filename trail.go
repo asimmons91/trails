@@ -1,3 +1,26 @@
+// Package trails is a batteries-included Go web framework in the
+// style of Rails/Django: Trail is the application (built via New from a
+// TrailOptions, and run via Trail.Run), Router/Group register handlers
+// and middleware (Get/Post/etc., Use, NewGroup/WithGroup, Resource(s)),
+// Context is the per-request handle every HandlerFunc receives, and
+// html/template-based views under a ViewFS are rendered via
+// Context.Render/RenderBlock. Cross-cutting concerns each live in their
+// own subpackage (allowedhosts, cors, session, csrf, secureheaders,
+// trustedproxy, ratelimit, ...) as Router.Use middleware, and larger
+// optional features (assets, cache, channels, jobs, auth) as separate
+// subpackages composed in rather than built into this one; Spur lets a
+// subpackage bundle its own views/assets/routes/jobs/background work into
+// one mountable unit (see Mount, RegisterSpurRoutes/Jobs/Runners).
+//
+//	t, err := trails.New(trails.WithDefaultOptions(&trails.TrailOptions{
+//	    ViewFS:       viewFS,
+//	    AssetsFS:     assetsFS,
+//	    RouteBuilder: routes.Build,
+//	}))
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	log.Fatal(t.Run())
 package trails
 
 import (
@@ -16,14 +39,18 @@ import (
 	"github.com/asimmons91/trails/assets"
 )
 
-// Runner is a background loop a host app needs kept alive alongside the HTTP
-// server — e.g. a polling Broadcaster's delivery loop, or a jobs.Backend's
-// worker loop. Run must return once ctx is cancelled; see Trail.Run and
-// RegisterSpurRunners.
+// Runner is a background loop a host app needs kept alive alongside the
+// HTTP server — e.g. channels/backend/database.Backend's polling
+// delivery loop, or jobs/backend/dbqueue.Backend's worker loop. Run must
+// return once ctx is cancelled; see Trail.Run and RegisterSpurRunners.
 type Runner interface {
 	Run(ctx context.Context) error
 }
 
+// Trail is a running trails application: the HTTP handler (via
+// ServeHTTP), Router, and any background Runners, all built from a
+// TrailOptions by New. Host and Port are read directly by Run to build
+// the listen address.
 type Trail struct {
 	router       *Router
 	context      context.Context
@@ -40,10 +67,18 @@ type Trail struct {
 	writeTimeout      time.Duration
 	idleTimeout       time.Duration
 
+	// Host is the address Run listens on.
 	Host string
+	// Port is the port Run listens on.
 	Port int
 }
 
+// New builds a Trail from o: it constructs the Router (calling
+// o.RouteBuilder once to register routes) and the view renderer (loading
+// o.AssetsFS's manifest and, for AssetsStrategyImportMap, o.ConfigFS's
+// importmap.toml). Callers should pass o through WithDefaultOptions
+// first — New itself applies no defaults, so a zero-value field (e.g. a
+// nil Logger) reaches Trail as-is and can panic later (e.g. in Run).
 func New(o *TrailOptions) (*Trail, error) {
 	t := &Trail{
 		context:      o.Context,
@@ -129,14 +164,25 @@ func (t *Trail) setupPool() {
 	}
 }
 
+// ServeHTTP implements http.Handler by delegating to the Router.
 func (t *Trail) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t.router.ServeHTTP(w, r)
 }
 
+// Use appends mws to the Trail's Router — see Router.Use.
 func (t *Trail) Use(mws ...MiddlewareFunc) {
 	t.router.Use(mws...)
 }
 
+// Run starts the HTTP server on Host:Port and every configured Runner
+// (TrailOptions.Runners), then blocks until os.Interrupt or SIGTERM, a
+// server error, or a Runner error — whichever comes first — and shuts
+// everything down: it cancels the Runners' shared context (so they all
+// start exiting immediately, even if a Runner error rather than the
+// signal is what triggered shutdown), gives the HTTP server 5 seconds to
+// finish in-flight requests via Shutdown before force-closing it, then
+// waits for every Runner to return. It returns the first server or
+// Runner error encountered, or nil on a clean signal-triggered shutdown.
 func (t *Trail) Run() error {
 	addr := fmt.Sprintf("%s:%d", t.Host, t.Port)
 	server := &http.Server{

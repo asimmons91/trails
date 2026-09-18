@@ -8,6 +8,14 @@ import (
 	"github.com/asimmons91/trails/pack"
 )
 
+// Run polls for and delivers new messages, and periodically trims
+// expired ones, until ctx is cancelled. It satisfies trails.Runner, and
+// must be kept running (e.g. via RegisterSpurRunners) for this Backend to
+// ever deliver anything — Publish only writes rows; Run is what turns
+// them into delivered messages, locally and in every other process
+// polling the same table. A subscriber slow enough to fall behind
+// delivery has messages dropped rather than blocking the poll loop for
+// everyone else.
 func (b *Backend) Run(ctx context.Context) error {
 	pollTicker := time.NewTicker(b.pollInterval)
 	defer pollTicker.Stop()

@@ -1,3 +1,11 @@
+// Package httpcache provides HTTP response-caching middleware built on a
+// cache.Store: GET/HEAD requests that get a 200 OK response are cached
+// (keyed, by default, on method+path+query) and served on a hit with
+// ETag/If-None-Match support — a matching If-None-Match gets a bodyless
+// 304. Any other method, and any non-200 response, is passed straight
+// through, neither served from nor written to the cache.
+//
+//	t.Use(httpcache.Middleware(store))
 package httpcache
 
 import (
@@ -15,6 +23,11 @@ import (
 
 const defaultTTL = 5 * time.Minute
 
+// KeyFunc derives a cache key from the incoming request. The default
+// (method + path + raw query string) gives GET and HEAD requests to the
+// same URL distinct entries and varies by every query parameter; use
+// WithKeyFunc to share entries across requests that don't affect the
+// response.
 type KeyFunc func(r *http.Request) string
 
 func defaultKeyFunc(r *http.Request) string {
@@ -26,12 +39,17 @@ type config struct {
 	keyFunc KeyFunc
 }
 
+// Option configures Middleware.
 type Option func(*config)
 
+// WithTTL sets how long a cached response is served before it's treated
+// as a miss. The default is 5 minutes.
 func WithTTL(d time.Duration) Option {
 	return func(c *config) { c.ttl = d }
 }
 
+// WithKeyFunc overrides the default KeyFunc used to derive a cache key
+// from each request.
 func WithKeyFunc(fn KeyFunc) Option {
 	return func(c *config) { c.keyFunc = fn }
 }
@@ -43,6 +61,11 @@ type cachedResponse struct {
 	ETag   string
 }
 
+// Middleware caches GET/HEAD responses in store. Only a 200 OK response is
+// cached; anything else is written straight through uncached. A cache hit
+// is served with the response's original headers and status plus an
+// ETag; if the request's If-None-Match matches that ETag, a bodyless 304
+// is served instead of the cached body.
 func Middleware(store cache.Store, opts ...Option) trails.MiddlewareFunc {
 	cfg := &config{ttl: defaultTTL, keyFunc: defaultKeyFunc}
 	for _, opt := range opts {

@@ -1,8 +1,7 @@
 // Package allowedhosts validates the incoming Host header against a
-// configured allowlist before any route handler runs — trails' equivalent
-// of Django's ALLOWED_HOSTS setting / Rails' config.hosts
-// (ActionDispatch::HostAuthorization). It defends against Host-header
-// attacks (cache poisoning, password-reset-link poisoning, and any code
+// configured allowlist before any route handler runs.
+// It defends against Host-header attacks
+// (cache poisoning, password-reset-link poisoning, and any code
 // that builds absolute URLs from the request) that rely on the application
 // trusting an attacker-controlled Host header.
 //
@@ -15,10 +14,9 @@
 //	)
 //
 // Like every other trails middleware, this only runs for routes registered
-// through Router's HandleFunc-based helpers (Get/Post/NewGroup/etc.).
-// Router.Static bypasses the middleware chain entirely (see the cors
-// package doc comment for the same caveat) — static file routes are never
-// Host-checked.
+// through Router's HandleFunc-based helpers (Get/Post/NewGroup/etc.). As
+// with cors/trustedproxy, requests that bypass the middleware chain
+// (Router.Static) are never Host-checked.
 package allowedhosts
 
 import (
@@ -102,8 +100,7 @@ func (cfg *config) matches(host string) bool {
 
 // Middleware returns middleware that rejects any request whose Host header
 // doesn't match the configured allowlist with
-// trails.NewHTTPError(http.StatusBadRequest, ...) (matching Django's 400
-// DisallowedHost / Rails' default blocked-host response). See the package
+// trails.NewHTTPError(http.StatusBadRequest, ...). See the package
 // doc comment for the empty-list no-op default and Router.Static caveat.
 func Middleware(opts ...Option) trails.MiddlewareFunc {
 	cfg := newConfig(opts)

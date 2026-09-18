@@ -15,6 +15,9 @@ import (
 	"github.com/asimmons91/trails/internal/credentials"
 )
 
+// Environment reports the app's current environment: TRAILS_ENV if set,
+// else "test" under go test, else "development". LoadConfig's caller
+// typically passes this straight through.
 func Environment() string {
 	if v := os.Getenv("TRAILS_ENV"); v != "" {
 		return v
@@ -27,6 +30,20 @@ func Environment() string {
 	return "development"
 }
 
+// LoadConfig builds a T by layering, in order: config/application.toml,
+// config/environments/<environment>.toml, environment's decrypted
+// credentials (skipped if none exist — see LoadCredentials), and finally
+// any TRAILS_* environment variable overrides. Each layer's fields simply
+// overwrite whatever the previous layers set, so later layers win
+// field-by-field, not layer-by-layer as a whole.
+//
+// A TRAILS_* override maps to a field by its toml tag, split on "_" and
+// matched against the same-split remainder of the env var name — greedy
+// and longest-match-first, so TRAILS_LOG_LEVEL_NAME resolves to a field
+// tagged toml:"level_name" nested under one tagged toml:"log" rather than
+// dead-ending on a same-named toml:"log_level" field that has no further
+// match. Nested structs are matched recursively the same way; the final
+// remaining name segments must exactly match one field's tag.
 func LoadConfig[T any](environment string, configFS fs.FS) (*T, error) {
 	var cfg T
 

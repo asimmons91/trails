@@ -9,6 +9,8 @@ import (
 
 const schedulerTickInterval = time.Second
 
+// Scheduler periodically enqueues each due Schedule in a Registry against a
+// Backend. See Run.
 type Scheduler struct {
 	registry *Registry
 	backend  Backend
@@ -17,6 +19,8 @@ type Scheduler struct {
 	nextRun map[string]time.Time
 }
 
+// NewScheduler returns a Scheduler that enqueues registry's due Schedules
+// against backend.
 func NewScheduler(registry *Registry, backend Backend) *Scheduler {
 	return &Scheduler{
 		registry: registry,
@@ -25,6 +29,8 @@ func NewScheduler(registry *Registry, backend Backend) *Scheduler {
 	}
 }
 
+// Run ticks once a second, enqueuing every Schedule that's due, until ctx is
+// canceled. It always returns nil.
 func (s *Scheduler) Run(ctx context.Context) error {
 	ticker := time.NewTicker(schedulerTickInterval)
 	defer ticker.Stop()

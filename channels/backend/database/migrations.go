@@ -6,6 +6,13 @@ import (
 	"github.com/asimmons91/trails/pack/migrate"
 )
 
+// Migration creates the channel_messages table this backend needs. It is
+// not self-registering — apps that choose the database channels backend
+// register it themselves, e.g. in db/migrations:
+//
+//	func init() {
+//		migrate.Register(database.Migration)
+//	}
 var Migration = migrate.Migration{
 	ID: "20260915000000_create_channel_messages",
 

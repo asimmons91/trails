@@ -1,3 +1,9 @@
+// Package memory provides an in-process, non-durable channels.Broadcaster:
+// Publish delivers synchronously to every current subscriber within the
+// same process, and Close closes every subscriber's Messages channel and
+// makes the Backend permanently unusable. Its Run is a no-op (there's
+// nothing to poll) — it exists only so memory.Backend is interchangeable
+// with channels/backend/database wherever a trails.Runner is expected.
 package memory
 
 import (
@@ -11,6 +17,8 @@ import (
 
 const defaultSubscriptionBuffer = 16
 
+// ErrClosed is returned by Publish and Subscribe once the Backend has
+// been Closed.
 var ErrClosed = errors.New("memory: broadcaster closed")
 
 var (
@@ -18,16 +26,21 @@ var (
 	_ trails.Runner        = (*Backend)(nil)
 )
 
+// Backend is an in-process channels.Broadcaster. Construct one with New.
 type Backend struct {
 	mu     sync.Mutex
 	topics map[string]map[*subscription]struct{}
 	closed bool
 }
 
+// New returns a ready-to-use Backend.
 func New() *Backend {
 	return &Backend{topics: make(map[string]map[*subscription]struct{})}
 }
 
+// Publish delivers payload synchronously to every current subscriber of
+// topic within this process. A subscriber whose buffer is full is
+// dropped rather than blocking the publisher or other subscribers.
 func (b *Backend) Publish(_ context.Context, topic string, payload []byte) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -46,6 +59,8 @@ func (b *Backend) Publish(_ context.Context, topic string, payload []byte) error
 	return nil
 }
 
+// Subscribe returns a Subscription that receives every payload
+// subsequently Published to topic in this process.
 func (b *Backend) Subscribe(_ context.Context, topic string) (channels.Subscription, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -75,6 +90,9 @@ func (b *Backend) Run(ctx context.Context) error {
 	return nil
 }
 
+// Close closes every current Subscription's Messages channel and makes b
+// permanently unusable — subsequent Publish/Subscribe calls return
+// ErrClosed. It is safe to call more than once.
 func (b *Backend) Close() error {
 	b.mu.Lock()
 	if b.closed {

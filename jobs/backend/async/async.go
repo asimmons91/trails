@@ -1,3 +1,7 @@
+// Package async provides an in-process, non-durable jobs.Backend: Enqueue
+// hands work to a fixed pool of goroutines, with optional per-key
+// concurrency limiting and delayed dispatch via Enqueued.ScheduledAt.
+// Nothing is persisted, so a process restart drops whatever hasn't run yet.
 package async
 
 import (
@@ -16,12 +20,17 @@ const (
 	requeueDelayJitter = 150 * time.Millisecond
 )
 
+// Option configures a Backend created by New.
 type Option func(*Backend)
 
+// WithLogger sets the logger a Backend uses to report job failures (default
+// slog.Default()).
 func WithLogger(l *slog.Logger) Option {
 	return func(b *Backend) { b.logger = l }
 }
 
+// WithQueueSize overrides the Backend's internal channel buffer size
+// (default 64).
 func WithQueueSize(n int) Option {
 	return func(b *Backend) { b.queue = make(chan jobs.Enqueued, n) }
 }
@@ -31,6 +40,9 @@ type slot struct {
 	expiresAt time.Time
 }
 
+// Backend is an in-process jobs.Backend: Enqueue dispatches jobs to a fixed
+// pool of worker goroutines started by New. It persists nothing, so an
+// unprocessed job is lost if the process exits before a worker runs it.
 type Backend struct {
 	reg    *jobs.Registry
 	logger *slog.Logger
@@ -45,6 +57,8 @@ type Backend struct {
 	slots map[string]*slot
 }
 
+// New returns a Backend with workers goroutines processing reg's jobs. Call
+// Close (or Drain, to wait without stopping workers) during shutdown.
 func New(reg *jobs.Registry, workers int, opts ...Option) *Backend {
 	b := &Backend{
 		reg:    reg,
@@ -66,6 +80,9 @@ func New(reg *jobs.Registry, workers int, opts ...Option) *Backend {
 	return b
 }
 
+// Enqueue hands e to a worker goroutine, or — if e.ScheduledAt is in the
+// future — schedules it to be handed off later via time.AfterFunc. It
+// always returns nil; delivery isn't guaranteed if Close runs first.
 func (b *Backend) Enqueue(ctx context.Context, e jobs.Enqueued) error {
 	b.inFlight.Add(1)
 
@@ -99,6 +116,9 @@ func (b *Backend) work() {
 	}
 }
 
+// dispatch acquires e's concurrency slot if it has a ConcurrencyKey,
+// re-queueing itself after a jittered delay when the slot is full, then
+// runs e through the Registry.
 func (b *Backend) dispatch(e jobs.Enqueued) {
 	if e.ConcurrencyKey != "" && !b.tryAcquire(e.ConcurrencyKey, e.ConcurrencyLimit, e.ConcurrencyDuration) {
 		time.AfterFunc(requeueDelay(), func() { b.send(e) })
@@ -153,6 +173,9 @@ func (b *Backend) release(key string) {
 	}
 }
 
+// Drain blocks until every job already accepted by Enqueue has finished, or
+// ctx is done. It does not stop new jobs from being enqueued while
+// draining.
 func (b *Backend) Drain(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
@@ -168,6 +191,10 @@ func (b *Backend) Drain(ctx context.Context) error {
 	}
 }
 
+// Close signals every worker to stop and waits for them to exit. Whatever
+// job a worker is currently running finishes first, but queued jobs that
+// haven't started yet are dropped. Call Drain first to wait for all
+// accepted work to finish instead.
 func (b *Backend) Close() error {
 	close(b.stop)
 	b.workers.Wait()
