@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/kong v1.16.1
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/stretchr/testify v1.12.1
+	golang.org/x/crypto v0.57.0
 	golang.org/x/tools v0.50.0
 )
 
