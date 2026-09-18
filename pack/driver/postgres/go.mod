@@ -3,7 +3,7 @@ module github.com/asimmons91/trails/pack/driver/postgres
 go 1.27
 
 require (
-	github.com/asimmons91/trails v0.1.1
+	github.com/asimmons91/trails v0.2.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0

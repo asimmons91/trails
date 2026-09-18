@@ -4,8 +4,8 @@ go 1.27
 
 require (
 	cloud.google.com/go/cloudtasks v1.19.0
-	github.com/asimmons91/trails v0.1.1
-	github.com/asimmons91/trails/pack/driver/sqlite v0.1.1
+	github.com/asimmons91/trails v0.2.0
+	github.com/asimmons91/trails/pack/driver/sqlite v0.2.0
 	github.com/googleapis/gax-go/v2 v2.24.1
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/api v0.298.0
