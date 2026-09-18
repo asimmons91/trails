@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -98,11 +99,34 @@ func (p *SecurePassword) hashPending(requireOnCreate bool) error {
 	return nil
 }
 
+// dummyDigest is hashed once, on first use, at whatever BCryptCost is set
+// to at that point. Authenticate compares against it when PasswordDigest is
+// empty so that path costs the same as a real comparison.
+var dummyDigest = sync.OnceValue(func() string {
+	digest, err := bcrypt.GenerateFromPassword([]byte("trails-dummy-password-for-timing-safety"), BCryptCost)
+	if err != nil {
+		return ""
+	}
+	return string(digest)
+})
+
 // Authenticate reports whether password matches the stored PasswordDigest.
+//
+// It always runs a bcrypt comparison, even when PasswordDigest is empty
+// (e.g. the caller looked up a user that doesn't exist and got a
+// zero-value struct). Without this, a caller doing the common
+// `user, _ := findByEmail(email); user.Authenticate(password)` pattern
+// would return near-instantly for a nonexistent user but take the full
+// bcrypt cost for a real one with a wrong password — a timing oracle for
+// user enumeration (see Rails' authenticate_by / Django's
+// ModelBackend.authenticate, which both hash a dummy password for the same
+// reason).
 func (p *SecurePassword) Authenticate(password string) bool {
-	if p.PasswordDigest == "" {
-		return false
+	digest := p.PasswordDigest
+	if digest == "" {
+		digest = dummyDigest()
 	}
 
-	return bcrypt.CompareHashAndPassword([]byte(p.PasswordDigest), []byte(password)) == nil
+	match := bcrypt.CompareHashAndPassword([]byte(digest), []byte(password)) == nil
+	return match && p.PasswordDigest != ""
 }
